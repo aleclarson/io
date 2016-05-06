@@ -1,0 +1,17 @@
+{
+  "name": "io",
+  "description": "A bundle of synchronous & asynchronous helpers for Node.",
+  "version": "1.0.0",
+  "dependencies": {
+    "define": "aleclarson/define#1.0.0",
+    "globby": "^2.1.0",
+    "iconv-lite": "^0.4.10",
+    "isNodeJS": "aleclarson/isNodeJS#1.0.0",
+    "lotus-require": "aleclarson/lotus-require#1.0.0",
+    "mkdirp": "^0.5.1",
+    "q": "aleclarson/q#1.0.0",
+    "q-io": "aleclarson/q-io",
+    "rimraf": "^2.4.3",
+    "type-utils": "aleclarson/type-utils#1.0.0"
+  }
+}
