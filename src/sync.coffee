@@ -1,6 +1,4 @@
 
-require "lotus-require"
-
 { resolve, dirname, relative, join } = require "path"
 
 mkdirp = require "mkdirp"

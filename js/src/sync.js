@@ -1,7 +1,5 @@
 var defaultEncoding, define, dirname, fs, globby, iconv, join, mkdirp, ref, relative, resolve, rimraf, sync;
 
-require("lotus-require");
-
 ref = require("path"), resolve = ref.resolve, dirname = ref.dirname, relative = ref.relative, join = ref.join;
 
 mkdirp = require("mkdirp");
