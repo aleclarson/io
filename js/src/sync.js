@@ -1,6 +1,4 @@
-var defaultEncoding, define, dirname, fs, globby, iconv, join, mkdirp, ref, relative, resolve, rimraf, sync;
-
-ref = require("path"), resolve = ref.resolve, dirname = ref.dirname, relative = ref.relative, join = ref.join;
+var FS, Path, defaultEncoding, define, globby, iconv, mkdirp, rimraf, sync;
 
 mkdirp = require("mkdirp");
 
@@ -12,7 +10,9 @@ define = require("define");
 
 iconv = require("iconv-lite");
 
-fs = require("fs");
+Path = require("path");
+
+FS = require("fs");
 
 defaultEncoding = "utf8";
 
@@ -25,7 +25,7 @@ define(sync = exports, {
     if (options == null) {
       options = {};
     }
-    contents = fs.readFileSync(String(path));
+    contents = FS.readFileSync(String(path));
     if (options.encoding !== null) {
       contents = iconv.decode(contents, options.encoding || defaultEncoding);
       if (contents.charCodeAt(0) === 0xFEFF) {
@@ -38,11 +38,11 @@ define(sync = exports, {
     if (options == null) {
       options = {};
     }
-    sync.makeDir(dirname(path));
+    sync.makeDir(Path.dirname(path));
     if (!Buffer.isBuffer(contents)) {
       contents = iconv.encode(contents, options.encoding != null ? options.encoding : options.encoding = defaultEncoding);
     }
-    fs.writeFileSync(path, contents, options);
+    FS.writeFileSync(path, contents, options);
     return true;
   },
   append: function(path, contents) {
@@ -52,18 +52,18 @@ define(sync = exports, {
     if (!Buffer.isBuffer(contents)) {
       contents = iconv.encode(contents, options.encoding != null ? options.encoding : options.encoding = defaultEncoding);
     }
-    fs.appendFileSync(path, contents, options);
+    FS.appendFileSync(path, contents, options);
     return true;
   },
   exists: function(path) {
-    return fs.existsSync(path);
+    return FS.existsSync(path);
   },
   copy: function(path, dest, options) {
-    var child, childDest, contents, i, len, ref1;
+    var child, childDest, contents, i, len, ref;
     if (options == null) {
       options = {};
     }
-    path = resolve(path);
+    path = Path.resolve(path);
     if (sync.isFile(path)) {
       contents = sync.read(path);
       if (options.force || !sync.exists(dest)) {
@@ -75,19 +75,19 @@ define(sync = exports, {
       }
       return false;
     } else if (sync.isDir(path)) {
-      dest = resolve(dest);
-      ref1 = sync.match(path + "/**");
-      for (i = 0, len = ref1.length; i < len; i++) {
-        child = ref1[i];
+      dest = Path.resolve(dest);
+      ref = sync.match(path + "/**");
+      for (i = 0, len = ref.length; i < len; i++) {
+        child = ref[i];
         if (sync.isFile(child)) {
-          childDest = join(dest, relative(path, child));
+          childDest = Path.join(dest, Path.relative(path, child));
           sync.copy(child, childDest, options);
         }
       }
     }
   },
   move: function(path, dest) {
-    return fs.renameSync(path, dest);
+    return FS.renameSync(path, dest);
   },
   remove: function(path) {
     path = String(path);
@@ -101,7 +101,7 @@ define(sync = exports, {
     return mkdirp.sync(path);
   },
   readDir: function(path) {
-    return fs.readdirSync(path);
+    return FS.readdirSync(path);
   },
   isDir: function(path) {
     return sync.exists(path) && sync.stats(path).isDirectory();
@@ -110,7 +110,7 @@ define(sync = exports, {
     return sync.exists(path) && sync.stats(path).isFile();
   },
   stats: function(path) {
-    return fs.statSync(path);
+    return FS.statSync(path);
   }
 });
 

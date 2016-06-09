@@ -1,46 +1,46 @@
 
+Promise = require "Promise"
 define = require "define"
 globby = require "globby"
 qfs = require "q-io/fs"
-q = require "q"
 
 define exports,
 
   match: (globs) ->
-    q.nfcall globby, globs
+    globby.async globs
 
   read: (path) ->
-    qfs.read path
+    Promise qfs.read path
 
   write: (path, contents) ->
-    qfs.write path, contents
+    Promise qfs.write path, contents
 
   append: (path, contents) ->
-    qfs.append path, contents
+    Promise qfs.append path, contents
 
   exists: (path) ->
-    qfs.exists path
+    Promise qfs.exists path
 
   copy: (path, dest) ->
-    qfs.copyTree path, dest
+    Promise qfs.copyTree path, dest
 
   move: (path, dest) ->
-    qfs.move path, dest
+    Promise qfs.move path, dest
 
   remove: (path) ->
-    qfs.removeTree path
+    Promise qfs.removeTree path
 
   makeDir: (path) ->
-    qfs.makeTree path
+    Promise qfs.makeTree path
 
   readDir: (path) ->
-    qfs.list path
+    Promise qfs.list path
 
   isDir: (path) ->
-    qfs.isDirectory path
+    Promise qfs.isDirectory path
 
   isFile: (path) ->
-    qfs.isFile path
+    Promise qfs.isFile path
 
   stats: (path) ->
-    qfs.stat path
+    Promise qfs.stat path

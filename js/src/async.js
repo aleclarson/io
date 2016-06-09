@@ -1,4 +1,6 @@
-var define, globby, q, qfs;
+var Promise, define, globby, qfs;
+
+Promise = require("Promise");
 
 define = require("define");
 
@@ -6,47 +8,45 @@ globby = require("globby");
 
 qfs = require("q-io/fs");
 
-q = require("q");
-
 define(exports, {
   match: function(globs) {
-    return q.nfcall(globby, globs);
+    return globby.async(globs);
   },
   read: function(path) {
-    return qfs.read(path);
+    return Promise(qfs.read(path));
   },
   write: function(path, contents) {
-    return qfs.write(path, contents);
+    return Promise(qfs.write(path, contents));
   },
   append: function(path, contents) {
-    return qfs.append(path, contents);
+    return Promise(qfs.append(path, contents));
   },
   exists: function(path) {
-    return qfs.exists(path);
+    return Promise(qfs.exists(path));
   },
   copy: function(path, dest) {
-    return qfs.copyTree(path, dest);
+    return Promise(qfs.copyTree(path, dest));
   },
   move: function(path, dest) {
-    return qfs.move(path, dest);
+    return Promise(qfs.move(path, dest));
   },
   remove: function(path) {
-    return qfs.removeTree(path);
+    return Promise(qfs.removeTree(path));
   },
   makeDir: function(path) {
-    return qfs.makeTree(path);
+    return Promise(qfs.makeTree(path));
   },
   readDir: function(path) {
-    return qfs.list(path);
+    return Promise(qfs.list(path));
   },
   isDir: function(path) {
-    return qfs.isDirectory(path);
+    return Promise(qfs.isDirectory(path));
   },
   isFile: function(path) {
-    return qfs.isFile(path);
+    return Promise(qfs.isFile(path));
   },
   stats: function(path) {
-    return qfs.stat(path);
+    return Promise(qfs.stat(path));
   }
 });
 
