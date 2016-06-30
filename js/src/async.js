@@ -10,44 +10,44 @@ qfs = require("q-io/fs");
 
 define(exports, {
   match: function(globs) {
-    return globby.async(globs);
+    return globby(globs);
   },
-  read: function(path) {
-    return Promise(qfs.read(path));
-  },
-  write: function(path, contents) {
-    return Promise(qfs.write(path, contents));
-  },
-  append: function(path, contents) {
-    return Promise(qfs.append(path, contents));
-  },
-  exists: function(path) {
-    return Promise(qfs.exists(path));
-  },
-  copy: function(path, dest) {
-    return Promise(qfs.copyTree(path, dest));
-  },
-  move: function(path, dest) {
-    return Promise(qfs.move(path, dest));
-  },
-  remove: function(path) {
-    return Promise(qfs.removeTree(path));
-  },
-  makeDir: function(path) {
-    return Promise(qfs.makeTree(path));
-  },
-  readDir: function(path) {
-    return Promise(qfs.list(path));
-  },
-  isDir: function(path) {
-    return Promise(qfs.isDirectory(path));
-  },
-  isFile: function(path) {
-    return Promise(qfs.isFile(path));
-  },
-  stats: function(path) {
-    return Promise(qfs.stat(path));
-  }
+  read: Promise.wrap(function(path) {
+    return qfs.read(path);
+  }),
+  write: Promise.wrap(function(path, contents) {
+    return qfs.write(path, contents);
+  }),
+  append: Promise.wrap(function(path, contents) {
+    return qfs.append(path, contents);
+  }),
+  exists: Promise.wrap(function(path) {
+    return qfs.exists(path);
+  }),
+  copy: Promise.wrap(function(path, dest) {
+    return qfs.copyTree(path, dest);
+  }),
+  move: Promise.wrap(function(path, dest) {
+    return qfs.move(path, dest);
+  }),
+  remove: Promise.wrap(function(path) {
+    return qfs.removeTree(path);
+  }),
+  makeDir: Promise.wrap(function(path) {
+    return qfs.makeTree(path);
+  }),
+  readDir: Promise.wrap(function(path) {
+    return qfs.list(path);
+  }),
+  isDir: Promise.wrap(function(path) {
+    return qfs.isDirectory(path);
+  }),
+  isFile: Promise.wrap(function(path) {
+    return qfs.isFile(path);
+  }),
+  stats: Promise.wrap(function(path) {
+    return qfs.stat(path);
+  })
 });
 
 //# sourceMappingURL=../../map/src/async.map

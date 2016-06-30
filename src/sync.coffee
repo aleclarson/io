@@ -1,77 +1,174 @@
 
-mkdirp = require "mkdirp"
+assertType = require "assertType"
 rimraf = require "rimraf"
+mkdirp = require "mkdirp"
 globby = require "globby"
 define = require "define"
+assert = require "assert"
 iconv = require "iconv-lite"
-Path = require "path"
-FS = require "fs"
+path = require "path"
+fs = require "fs"
 
-defaultEncoding = "utf8"
+UTF8 = "utf8"
 
-define sync = exports,
+sync =
+
+#
+# Testing existence
+#
+
+  exists: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    return fs.existsSync filePath
+
+  isFile: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    return sync.exists(filePath) and
+      sync.stats(filePath).isFile()
+
+  isDir: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    return sync.exists(filePath) and
+      sync.stats(filePath).isDirectory()
+
+#
+# Reading data
+#
 
   match: (globs) ->
-    globby.sync globs
+    assertType globs, [ String, Array ]
+    return globby.sync globs
 
-  read: (path, options = {}) ->
-    contents = FS.readFileSync String path
+  readDir: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    assert sync.isDir(filePath), "'filePath' must be an existing directory!"
+    return fs.readdirSync filePath
+
+  read: (filePath, options = {}) ->
+    assertType filePath, String
+    assertType options, Object
+    assert sync.isFile(filePath), "'filePath' must be an existing file!"
+    contents = fs.readFileSync filePath
     if options.encoding isnt null
-      contents = iconv.decode contents, options.encoding or defaultEncoding
+      contents = iconv.decode contents, options.encoding or UTF8
       contents = contents.slice 1 if contents.charCodeAt(0) is 0xFEFF
     return contents
 
-  write: (path, contents, options = {}) ->
-    sync.makeDir Path.dirname path
-    contents = iconv.encode contents, options.encoding ?= defaultEncoding unless Buffer.isBuffer contents
-    FS.writeFileSync path, contents, options
-    return yes
+  stats: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    return fs.statSync filePath
 
-  append: (path, contents) ->
-    return no unless sync.exists path
-    contents = iconv.encode contents, options.encoding ?= defaultEncoding unless Buffer.isBuffer contents
-    FS.appendFileSync path, contents, options
-    return yes
+#
+# Mutating data
+#
 
-  exists: (path) ->
-    FS.existsSync path
+  makeDir: (filePath) ->
+    assertType filePath, String
+    filePath = path.resolve filePath
+    assert not sync.isFile(filePath), "'filePath' must be a directory or not exist!"
+    return mkdirp.sync filePath
 
-  copy: (path, dest, options = {}) ->
-    path = Path.resolve path
-    if sync.isFile path
-      contents = sync.read path
-      if options.force or !sync.exists dest
-        if options.testRun then console.log "Copying '#{path}' to '#{dest}'"
-        else return sync.write dest, contents, options
-      return no
-    else if sync.isDir path
-      dest = Path.resolve dest
-      for child in sync.match path + "/**"
-        if sync.isFile child
-          childDest = Path.join dest, Path.relative path, child
-          sync.copy child, childDest, options
+  write: (filePath, contents, options = {}) ->
+
+    assertType filePath, String
+    filePath = path.resolve filePath
+    assert not sync.isDir(filePath), "'filePath' cannot be a directory!"
+
+    # Create any missing parent directories.
+    sync.makeDir path.dirname filePath
+
+    assertType contents, [ String, Buffer ]
+    options.encoding ?= UTF8 if not Buffer.isBuffer contents
+    contents = iconv.encode contents, options.encoding
+    fs.writeFileSync filePath, contents, options
     return
 
-  move: (path, dest) ->
-    FS.renameSync path, dest
+  append: (filePath, contents) ->
 
-  remove: (path) ->
-    path = String path
-    return no unless sync.exists path
-    rimraf.sync path
+    assertType filePath, String
+    filePath = path.resolve filePath
+    assert not sync.isDir(filePath), "'filePath' cannot be a directory!"
+
+    # Create the file if it does not exist.
+    if not sync.exists filePath
+      return sync.write filePath, contents
+
+    assertType contents, [ String, Buffer ]
+    options.encoding ?= UTF8 if not Buffer.isBuffer contents
+    contents = iconv.encode contents, options.encoding
+    fs.appendFileSync filePath, contents, options
+    return
+
+  # Options:
+  #   - force (Boolean): If true, avoid throwing when `destPath` already exists
+  #   - recursive (Boolean): If true, copy directories recursively (defaults to only copying files)
+  #   - testRun (Boolean): If true, print actions to console instead of actually doing them
+  copy: (filePath, destPath, options = {}) ->
+
+    assertType filePath, String
+    assertType destPath, String
+    assertType options, Object
+
+    filePath = path.resolve filePath
+    destPath = path.resolve destPath
+
+    assert sync.exists(filePath), "'filePath' must exist!"
+
+    if sync.isDir filePath
+
+      if options.testRun
+        if not sync.exists destPath
+          console.log "Creating '#{destPath}'"
+
+      # Copy the directory even if it's empty.
+      else sync.makeDir destPath
+
+      return sync.readDir(filePath).forEach (childName) ->
+        childPath = path.join filePath, childName
+        return if sync.isDir(childPath) and not options.recursive
+        childDest = path.join destPath, childName
+        sync.copy childPath, childDest, options
+
+    # Force an overwrite by setting `options.force` to true.
+    assert options.force or not sync.exists(destPath), "'destPath' must not exist!"
+
+    if options.testRun
+      console.log "Copying '#{filePath}' to '#{destPath}'"
+      return
+
+    sync.write destPath, sync.read filePath
+    return
+
+  move: (filePath, destPath) ->
+
+    assertType filePath, String
+    assertType destPath, String
+
+    filePath = path.resolve filePath
+    destPath = path.resolve destPath
+
+    assert sync.exists(filePath), "'filePath' must exist!"
+    assert not sync.exists(destPath), "'destPath' must not exist!"
+
+    # Create missing parent directories.
+    sync.makeDir path.dirname destPath
+
+    fs.renameSync filePath, destPath
+    return
+
+  remove: (filePath) ->
+
+    assertType filePath, String
+
+    filePath = path.resolve filePath
+    return no if not sync.exists filePath
+
+    rimraf.sync filePath
     return yes
 
-  makeDir: (path) ->
-    mkdirp.sync path
-
-  readDir: (path) ->
-    FS.readdirSync path
-
-  isDir: (path) ->
-    sync.exists(path) and sync.stats(path).isDirectory()
-
-  isFile: (path) ->
-    sync.exists(path) and sync.stats(path).isFile()
-
-  stats: (path) ->
-    FS.statSync path
+define exports, sync
