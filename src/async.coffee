@@ -1,27 +1,54 @@
 
-# TODO: Rewrite without "qfs"
+# TODO: Rewrite without "q-io/fs"
 
 Promise = require "Promise"
 define = require "define"
 globby = require "globby"
 qfs = require "q-io/fs"
+fs = require "fs"
 
-define exports,
+async =
 
-  match: (globs) ->
-    globby globs
+#
+# Testing existence
+#
+
+  exists: Promise.wrap (path) ->
+    qfs.exists path
+
+  isFile: Promise.wrap (path) ->
+    qfs.isFile path
+
+  isDir: Promise.wrap (path) ->
+    qfs.isDirectory path
+
+#
+# Reading data
+#
+
+  match: (globs, options) ->
+    globby globs, options
+
+  readDir: Promise.wrap (path) ->
+    qfs.list path
 
   read: Promise.wrap (path) ->
     qfs.read path
+
+  stats: Promise.ify fs.stat
+
+#
+# Mutating data
+#
+
+  makeDir: Promise.wrap (path) ->
+    qfs.makeTree path
 
   write: Promise.wrap (path, contents) ->
     qfs.write path, contents
 
   append: Promise.wrap (path, contents) ->
     qfs.append path, contents
-
-  exists: Promise.wrap (path) ->
-    qfs.exists path
 
   copy: Promise.wrap (path, dest) ->
     qfs.copyTree path, dest
@@ -32,17 +59,4 @@ define exports,
   remove: Promise.wrap (path) ->
     qfs.removeTree path
 
-  makeDir: Promise.wrap (path) ->
-    qfs.makeTree path
-
-  readDir: Promise.wrap (path) ->
-    qfs.list path
-
-  isDir: Promise.wrap (path) ->
-    qfs.isDirectory path
-
-  isFile: Promise.wrap (path) ->
-    qfs.isFile path
-
-  stats: Promise.wrap (path) ->
-    qfs.stat path
+define exports, async

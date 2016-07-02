@@ -38,9 +38,9 @@ sync =
 # Reading data
 #
 
-  match: (globs) ->
+  match: (globs, options) ->
     assertType globs, [ String, Array ]
-    return globby.sync globs
+    return globby.sync globs, options
 
   readDir: (filePath) ->
     assertType filePath, String

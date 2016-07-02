@@ -36,9 +36,9 @@ sync = {
     filePath = path.resolve(filePath);
     return sync.exists(filePath) && sync.stats(filePath).isDirectory();
   },
-  match: function(globs) {
+  match: function(globs, options) {
     assertType(globs, [String, Array]);
-    return globby.sync(globs);
+    return globby.sync(globs, options);
   },
   readDir: function(filePath) {
     assertType(filePath, String);

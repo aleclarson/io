@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "dependencies": {
     "Promise": "aleclarson/Promise#1.0.0",
+    "assert": "aleclarson/assert#1.0.0",
+    "assertType": "aleclarson/assertType#1.0.0",
     "define": "aleclarson/define#1.0.0",
     "globby": "aleclarson/globby#4.0.0",
     "iconv-lite": "^0.4.10",
@@ -12,12 +14,13 @@
     "rimraf": "^2.4.3"
   },
   "lotus": {
+    "dest": "js/src",
+    "plugins": [
+      "lotus-coffee"
+    ],
     "implicitDependencies": [
       "fs",
       "path"
-    ],
-    "plugins": [
-      "lotus-coffee"
     ]
   }
 }
