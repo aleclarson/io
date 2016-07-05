@@ -1,4 +1,4 @@
-var Promise, Reader, Writer, appendFile, assert, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, isDir, isFile, lstats, makeTree, match, mkdir, moveTree, openFile, path, readFile, readTree, readdir, removeTree, rename, stats, symlink, unlink, writeFile,
+var Promise, Reader, Writer, appendFile, assert, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile,
   indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
 emptyFunction = require("emptyFunction");
@@ -21,25 +21,25 @@ Writer = require("./writer");
 
 require("graceful-fs").gracefulify(fs);
 
-stats = Promise.ify(fs.stat);
+promised = {
+  "stat": "stat",
+  "lstat": "lstat",
+  "rename": "rename",
+  "symlink": "symlink",
+  "unlink": "unlink",
+  "readdir": "readdir",
+  "mkdir": "mkdir"
+};
 
-lstats = Promise.ify(fs.lstat);
-
-rename = Promise.ify(fs.rename);
-
-symlink = Promise.ify(fs.symlink);
-
-unlink = Promise.ify(fs.unlink);
-
-readdir = Promise.ify(fs.readdir);
-
-mkdir = Promise.ify(fs.mkdir);
+Object.keys(promised).forEach(function(key) {
+  return promised[key] = Promise.ify(fs[key]);
+});
 
 exists = function(filePath) {
   var onFulfilled, onRejected;
   onFulfilled = emptyFunction.thatReturnsTrue;
   onRejected = emptyFunction.thatReturnsFalse;
-  return stats(filePath).then(onFulfilled, onRejected);
+  return promised.stat(filePath).then(onFulfilled, onRejected);
 };
 
 isFile = function(filePath) {
@@ -48,7 +48,7 @@ isFile = function(filePath) {
     return stats.isFile();
   };
   onRejected = emptyFunction.thatReturnsFalse;
-  return stats(filePath).then(onFulfilled, onRejected);
+  return promised.stat(filePath).then(onFulfilled, onRejected);
 };
 
 isDir = function(filePath) {
@@ -57,13 +57,14 @@ isDir = function(filePath) {
     return stats.isDirectory();
   };
   onRejected = emptyFunction.thatReturnsFalse;
-  return stats(filePath).then(onFulfilled, onRejected);
+  return promised.stat(filePath).then(onFulfilled, onRejected);
+};
+
+readStats = function(filePath) {
+  return promised.stat(filePath);
 };
 
 readFile = function(filePath, options) {
-  if (options == null) {
-    options = {};
-  }
   return openFile(filePath, options).then(function(stream) {
     return stream.read();
   });
@@ -109,7 +110,7 @@ openFile = function(filePath, options) {
 
 readTree = function(filePath) {
   assertType(filePath, String);
-  return readdir(filePath);
+  return promised.readdir(filePath);
 };
 
 match = function(globs, options) {
@@ -165,7 +166,7 @@ appendFile = function(filePath, value, options) {
 copyFile = function(fromPath, toPath) {
   assertType(fromPath, String);
   assertType(toPath, String);
-  return stats(fromPath).then(function(stats) {
+  return promised.stat(fromPath).then(function(stats) {
     var reader, writer;
     reader = openFile(fromPath, {
       flags: "rb"
@@ -174,7 +175,9 @@ copyFile = function(fromPath, toPath) {
       flags: "wb",
       mode: stats.node.mode
     });
-    return Promise.all([reader, writer]).then([reader, writer])(function() {
+    return Promise.all([reader, writer]).then(function(arg) {
+      var reader, writer;
+      reader = arg[0], writer = arg[1];
       return reader.forEach(writer.write).then(function() {
         return Promise.all([reader.close(), write.close()]);
       });
@@ -191,13 +194,13 @@ makeTree = function(filePath, mode) {
   if (typeof mode === "string") {
     mode = parseInt(mode, 8);
   }
-  return mkdir(filePath, mode);
+  return promised.mkdir(filePath, mode);
 };
 
 copyTree = function(fromPath, toPath) {
   assertType(fromPath, String);
   assertType(toPath, String);
-  return stats(fromPath).then(function(stats) {
+  return promised.stat(fromPath).then(function(stats) {
     if (stats.isFile()) {
       return copyFile(fromPath, toPath);
     }
@@ -205,7 +208,7 @@ copyTree = function(fromPath, toPath) {
       return exists(toPath).then(function(exists) {
         return exists || makeTree(toPath, stats.node.mode);
       }).then(function() {
-        return readdir(fromPath);
+        return promised.readdir(fromPath);
       }).then(function(children) {
         return Promise.map(children, function(child) {
           var fromChild, toChild;
@@ -219,7 +222,7 @@ copyTree = function(fromPath, toPath) {
       });
     }
     if (stats.isSymbolicLink()) {
-      return symlink(toPath, fromPath, "file");
+      return promised.symlink(toPath, fromPath, "file");
     }
   });
 };
@@ -228,7 +231,7 @@ moveTree = function(fromPath, toPath) {
   assertType(fromPath, String);
   assertType(toPath, String);
   return rename(fromPath, toPath).fail(function(error) {
-    if (error.code !== "EXDEV") {
+    if (error.code === "EXDEV") {
       return copyTree(fromPath, toPath).then(function() {
         return removeTree(fromPath);
       });
@@ -239,11 +242,11 @@ moveTree = function(fromPath, toPath) {
 
 removeTree = function(filePath) {
   assertType(filePath, String);
-  return lstat(filePath).then(function(stats) {
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return unlink(filePath);
+  return promised.lstat(filePath).then(function(stats) {
+    if (!stats.isDirectory()) {
+      return promised.unlink(filePath);
     }
-    return readdir(filePath).then(function(children) {
+    return promised.readdir(filePath).then(function(children) {
       return Promise.map(children, function(child) {
         if (!path.isAbsolute(child)) {
           child = path.join(filePath, child);
@@ -258,7 +261,7 @@ module.exports = {
   exists: exists,
   isFile: isFile,
   isDir: isDir,
-  stats: stats,
+  stats: readStats,
   read: readFile,
   open: openFile,
   write: writeFile,

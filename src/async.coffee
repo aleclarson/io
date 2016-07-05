@@ -13,13 +13,18 @@ Writer = require "./writer"
 # Support exponential backoff.
 require("graceful-fs").gracefulify(fs)
 
-stats = Promise.ify fs.stat
-lstats = Promise.ify fs.lstat
-rename = Promise.ify fs.rename
-symlink = Promise.ify fs.symlink
-unlink = Promise.ify fs.unlink
-readdir = Promise.ify fs.readdir
-mkdir = Promise.ify fs.mkdir
+promised = {
+  "stat"
+  "lstat"
+  "rename"
+  "symlink"
+  "unlink"
+  "readdir"
+  "mkdir"
+}
+
+Object.keys(promised).forEach (key) ->
+  promised[key] = Promise.ify fs[key]
 
 #
 # Testing existence
@@ -28,26 +33,29 @@ mkdir = Promise.ify fs.mkdir
 exists = (filePath) ->
   onFulfilled = emptyFunction.thatReturnsTrue
   onRejected = emptyFunction.thatReturnsFalse
-  stats filePath
+  promised.stat filePath
   .then onFulfilled, onRejected
 
 isFile = (filePath) ->
   onFulfilled = (stats) -> stats.isFile()
   onRejected = emptyFunction.thatReturnsFalse
-  stats filePath
+  promised.stat filePath
   .then onFulfilled, onRejected
 
 isDir = (filePath) ->
   onFulfilled = (stats) -> stats.isDirectory()
   onRejected = emptyFunction.thatReturnsFalse
-  stats filePath
+  promised.stat filePath
   .then onFulfilled, onRejected
 
 #
 # Reading data
 #
 
-readFile = (filePath, options = {}) ->
+readStats = (filePath) ->
+  promised.stat filePath # BUG: Avoid error; only one argument can be passed.
+
+readFile = (filePath, options) ->
   openFile filePath, options
   .then (stream) -> stream.read()
 
@@ -84,7 +92,7 @@ openFile = (filePath, options = {}) ->
 
 readTree = (filePath) ->
   assertType filePath, String
-  return readdir filePath
+  return promised.readdir filePath
 
 match = (globs, options) ->
   assertType globs, [ String, Array ]
@@ -134,11 +142,11 @@ appendFile = (filePath, value, options = {}) ->
 copyFile = (fromPath, toPath) ->
   assertType fromPath, String
   assertType toPath, String
-  stats(fromPath).then (stats) ->
+  promised.stat(fromPath).then (stats) ->
     reader = openFile fromPath, flags: "rb"
     writer = openFile toPath, flags: "wb", mode: stats.node.mode
     Promise.all [ reader, writer ]
-    .then([ reader, writer ]) ->
+    .then ([ reader, writer ]) ->
       reader.forEach writer.write
       .then -> Promise.all [ reader.close(), write.close() ]
 
@@ -150,61 +158,84 @@ makeTree = (filePath, mode = "755") ->
   if typeof mode is "string"
     mode = parseInt mode, 8
 
-  mkdir filePath, mode
+  promised.mkdir filePath, mode
 
 copyTree = (fromPath, toPath) ->
 
   assertType fromPath, String
   assertType toPath, String
 
-  stats fromPath
+  promised.stat fromPath
   .then (stats) ->
 
     if stats.isFile()
       return copyFile fromPath, toPath
 
     if stats.isDirectory()
+
       return exists toPath
+
+      # Create any missing directories.
       .then (exists) -> exists or makeTree toPath, stats.node.mode
-      .then -> readdir fromPath
+
+      .then -> promised.readdir fromPath
+
       .then (children) ->
         Promise.map children, (child) ->
+
           if path.isAbsolute child
             child = path.relative fromPath
+
           fromChild = path.join fromPath, child
           toChild = path.join toPath, child
-          copyTree fromChild, toChild
+
+          return copyTree fromChild, toChild
 
     if stats.isSymbolicLink()
-      return symlink toPath, fromPath, "file"
+      return promised.symlink toPath, fromPath, "file"
 
 moveTree = (fromPath, toPath) ->
+
   assertType fromPath, String
   assertType toPath, String
+
   rename fromPath, toPath
   .fail (error) ->
+
     # Handle moving files across devices.
-    if error.code isnt "EXDEV"
+    if error.code is "EXDEV"
+
       return copyTree fromPath, toPath
+
       .then -> removeTree fromPath
+
     throw error
 
 removeTree = (filePath) ->
+
   assertType filePath, String
-  lstat(filePath).then (stats) ->
-    return unlink filePath if stats.isSymbolicLink() or not stats.isDirectory()
-    return readdir filePath
+
+  promised.lstat(filePath).then (stats) ->
+
+    if not stats.isDirectory()
+      return promised.unlink filePath
+
+    return promised.readdir filePath
+
     .then (children) ->
+
       Promise.map children, (child) ->
+
         if not path.isAbsolute child
           child = path.join filePath, child
+
         return removeTree child
 
 module.exports = {
   exists
   isFile
   isDir
-  stats
+  stats: readStats
   read: readFile
   open: openFile
   write: writeFile

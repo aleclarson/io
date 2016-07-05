@@ -49,6 +49,10 @@ promise = async.read filePath, options
 # Read `src/reader.coffee` or `src/writer.coffee` for more info.
 promise = async.open filePath, options
 
+# Resolves to an instance of `fs.Stats` for the given file.
+# https://nodejs.org/api/fs.html#fs_class_fs_stats
+promise = async.stats filePath
+
 # Resolves to the paths of the
 # immediate children in the given directory.
 promise = async.readDir filePath
