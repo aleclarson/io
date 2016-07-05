@@ -3,7 +3,6 @@ assertType = require "assertType"
 rimraf = require "rimraf"
 mkdirp = require "mkdirp"
 globby = require "globby"
-define = require "define"
 assert = require "assert"
 iconv = require "iconv-lite"
 path = require "path"
@@ -11,164 +10,177 @@ fs = require "fs"
 
 UTF8 = "utf8"
 
-sync =
-
 #
 # Testing existence
 #
 
-  exists: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    return fs.existsSync filePath
+exists = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  return fs.existsSync filePath
 
-  isFile: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    return sync.exists(filePath) and
-      sync.stats(filePath).isFile()
+isFile = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  return exists(filePath) and
+    stats(filePath).isFile()
 
-  isDir: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    return sync.exists(filePath) and
-      sync.stats(filePath).isDirectory()
+isDir = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  return exists(filePath) and
+    stats(filePath).isDirectory()
 
 #
 # Reading data
 #
 
-  match: (globs, options) ->
-    assertType globs, [ String, Array ]
-    return globby.sync globs, options
+stats = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  return fs.statSync filePath
 
-  readDir: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    assert sync.isDir(filePath), "'filePath' must be an existing directory!"
-    return fs.readdirSync filePath
+readFile = (filePath, options = {}) ->
+  assertType filePath, String
+  assertType options, Object
+  assert isFile(filePath), "'filePath' must be an existing file!"
+  contents = fs.readFileSync filePath
+  if options.encoding isnt null
+    contents = iconv.decode contents, options.encoding or UTF8
+    contents = contents.slice 1 if contents.charCodeAt(0) is 0xFEFF
+  return contents
 
-  read: (filePath, options = {}) ->
-    assertType filePath, String
-    assertType options, Object
-    assert sync.isFile(filePath), "'filePath' must be an existing file!"
-    contents = fs.readFileSync filePath
-    if options.encoding isnt null
-      contents = iconv.decode contents, options.encoding or UTF8
-      contents = contents.slice 1 if contents.charCodeAt(0) is 0xFEFF
-    return contents
+appendFile = (filePath, contents) ->
 
-  stats: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    return fs.statSync filePath
+  assertType filePath, String
+  filePath = path.resolve filePath
+  assert not isDir(filePath), "'filePath' cannot be a directory!"
+
+  # Create the file if it does not exist.
+  if not exists filePath
+    return writeFile filePath, contents
+
+  assertType contents, [ String, Buffer ]
+  options.encoding ?= UTF8 if not Buffer.isBuffer contents
+  contents = iconv.encode contents, options.encoding
+  fs.appendFileSync filePath, contents, options
+  return
+
+readTree = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  assert isDir(filePath), "'filePath' must be an existing directory!"
+  return fs.readdirSync filePath
+
+match = (globs, options) ->
+  assertType globs, [ String, Array ]
+  assertType options, Object.Maybe
+  return globby.sync globs, options
 
 #
 # Mutating data
 #
 
-  makeDir: (filePath) ->
-    assertType filePath, String
-    filePath = path.resolve filePath
-    assert not sync.isFile(filePath), "'filePath' must be a directory or not exist!"
-    return mkdirp.sync filePath
+writeFile = (filePath, contents, options = {}) ->
 
-  write: (filePath, contents, options = {}) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  assert not isDir(filePath), "'filePath' cannot be a directory!"
 
-    assertType filePath, String
-    filePath = path.resolve filePath
-    assert not sync.isDir(filePath), "'filePath' cannot be a directory!"
+  # Create any missing parent directories.
+  makeTree path.dirname filePath
 
-    # Create any missing parent directories.
-    sync.makeDir path.dirname filePath
+  assertType contents, [ String, Buffer ]
+  options.encoding ?= UTF8 if not Buffer.isBuffer contents
+  contents = iconv.encode contents, options.encoding
+  fs.writeFileSync filePath, contents, options
+  return
 
-    assertType contents, [ String, Buffer ]
-    options.encoding ?= UTF8 if not Buffer.isBuffer contents
-    contents = iconv.encode contents, options.encoding
-    fs.writeFileSync filePath, contents, options
-    return
+makeTree = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  assert not isFile(filePath), "'filePath' must be a directory or not exist!"
+  return mkdirp.sync filePath
 
-  append: (filePath, contents) ->
+# Options:
+#   - force (Boolean): If true, avoid throwing when `toPath` already exists
+#   - recursive (Boolean): If true, copy directories recursively (defaults to only copying files)
+#   - testRun (Boolean): If true, print actions to console instead of actually doing them
+copyTree = (fromPath, toPath, options = {}) ->
 
-    assertType filePath, String
-    filePath = path.resolve filePath
-    assert not sync.isDir(filePath), "'filePath' cannot be a directory!"
+  assertType fromPath, String
+  assertType toPath, String
+  assertType options, Object
 
-    # Create the file if it does not exist.
-    if not sync.exists filePath
-      return sync.write filePath, contents
+  fromPath = path.resolve fromPath
+  toPath = path.resolve toPath
 
-    assertType contents, [ String, Buffer ]
-    options.encoding ?= UTF8 if not Buffer.isBuffer contents
-    contents = iconv.encode contents, options.encoding
-    fs.appendFileSync filePath, contents, options
-    return
+  assert exists(fromPath), "Expected 'fromPath' to exist: '#{fromPath}'"
 
-  # Options:
-  #   - force (Boolean): If true, avoid throwing when `destPath` already exists
-  #   - recursive (Boolean): If true, copy directories recursively (defaults to only copying files)
-  #   - testRun (Boolean): If true, print actions to console instead of actually doing them
-  copy: (filePath, destPath, options = {}) ->
-
-    assertType filePath, String
-    assertType destPath, String
-    assertType options, Object
-
-    filePath = path.resolve filePath
-    destPath = path.resolve destPath
-
-    assert sync.exists(filePath), "'filePath' must exist!"
-
-    if sync.isDir filePath
-
-      if options.testRun
-        if not sync.exists destPath
-          console.log "Creating '#{destPath}'"
-
-      # Copy the directory even if it's empty.
-      else sync.makeDir destPath
-
-      return sync.readDir(filePath).forEach (childName) ->
-        childPath = path.join filePath, childName
-        return if sync.isDir(childPath) and not options.recursive
-        childDest = path.join destPath, childName
-        sync.copy childPath, childDest, options
-
-    # Force an overwrite by setting `options.force` to true.
-    assert options.force or not sync.exists(destPath), "'destPath' must not exist!"
+  if isDir fromPath
 
     if options.testRun
-      console.log "Copying '#{filePath}' to '#{destPath}'"
-      return
+      if not exists toPath
+        console.log "Creating '#{toPath}'"
 
-    sync.write destPath, sync.read filePath
+    # Copy the directory even if it's empty.
+    else makeTree toPath
+
+    return readTree(fromPath).forEach (child) ->
+      fromChild = path.join fromPath, child
+      return if isDir(fromChild) and not options.recursive
+      toChild = path.join toPath, child
+      copyTree fromChild, toChild, options
+
+  # Force an overwrite by setting `options.force` to true.
+  assert options.force or not exists(toPath), "Expected 'toPath' to not exist: '#{toPath}'"
+
+  if options.testRun
+    console.log "Copying '#{fromPath}' to '#{toPath}'"
     return
 
-  move: (filePath, destPath) ->
+  writeFile toPath, readFile fromPath
+  return
 
-    assertType filePath, String
-    assertType destPath, String
+moveTree = (fromPath, toPath) ->
 
-    filePath = path.resolve filePath
-    destPath = path.resolve destPath
+  assertType fromPath, String
+  assertType toPath, String
 
-    assert sync.exists(filePath), "'filePath' must exist!"
-    assert not sync.exists(destPath), "'destPath' must not exist!"
+  fromPath = path.resolve fromPath
+  toPath = path.resolve toPath
 
-    # Create missing parent directories.
-    sync.makeDir path.dirname destPath
+  assert exists(fromPath), "Expected 'fromPath' to exist: '#{fromPath}'"
+  assert not exists(toPath), "Expected 'toPath' to not exist: '#{toPath}'"
 
-    fs.renameSync filePath, destPath
-    return
+  # Create missing parent directories.
+  makeTree path.dirname toPath
 
-  remove: (filePath) ->
+  fs.renameSync fromPath, toPath
+  return
 
-    assertType filePath, String
+removeTree = (filePath) ->
 
-    filePath = path.resolve filePath
-    return no if not sync.exists filePath
+  assertType filePath, String
 
-    rimraf.sync filePath
-    return yes
+  filePath = path.resolve filePath
+  return no if not exists filePath
 
-define exports, sync
+  rimraf.sync filePath
+  return yes
+
+module.exports = {
+  exists
+  isFile
+  isDir
+  stats
+  read: readFile
+  write: writeFile
+  append: appendFile
+  match
+  readDir: readTree
+  makeDir: makeTree
+  copy: copyTree
+  move: moveTree
+  remove: removeTree
+}

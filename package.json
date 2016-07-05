@@ -1,20 +1,20 @@
 {
   "name": "io",
-  "description": "A bundle of synchronous & asynchronous helpers for Node.",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "dependencies": {
+    "NamedFunction": "aleclarson/NamedFunction#2.0.0",
     "Promise": "aleclarson/Promise#1.0.0",
     "assert": "aleclarson/assert#1.0.0",
     "assertType": "aleclarson/assertType#1.0.0",
-    "define": "aleclarson/define#1.0.0",
+    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
     "globby": "aleclarson/globby#4.0.0",
+    "graceful-fs": "^4.1.4",
     "iconv-lite": "^0.4.10",
     "mkdirp": "^0.5.1",
-    "q-io": "aleclarson/q-io",
     "rimraf": "^2.4.3"
   },
   "lotus": {
-    "dest": "js/src",
+    "dest": "js",
     "plugins": [
       "lotus-coffee"
     ],

@@ -1,5 +1,5 @@
 
 module.exports = {
-  sync: require('./js/src/sync'),
-  async: require('./js/src/async'),
+  sync: require('./js/sync'),
+  async: require('./js/async'),
 };
