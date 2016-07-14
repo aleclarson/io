@@ -1,72 +1,65 @@
 
-NamedFunction = require "NamedFunction"
+getArgProp = require "getArgProp"
 Promise = require "Promise"
-
-version = process.versions.node.split "."
-supportsFinish = version[0] >= 0 and version[1] >= 10
+assert = require "assert"
+Null = require "Null"
+Type = require "Type"
+fs = require "fs"
 
 # Wraps a Node writable stream, providing an API similar to
 # Narwhal's synchronous `io` streams, except returning and
 # accepting promises for long-latency operations.
-Writer = NamedFunction "Writer", (_stream, charset) ->
+type = Type "Writer"
 
-  self = Object.create Writer.prototype
+type.argumentTypes =
+  stream: fs.WriteStream
+  encoding: [ String, Null ]
 
-  if charset and _stream.setEncoding
-    _stream.setEncoding charset
+type.argumentDefaults =
+  encoding: "utf-8"
 
-  drained = Promise.defer()
+type.defineFrozenValues
 
-  _stream.on "error", (reason) ->
-    drained.reject reason
-    drained = Promise.defer()
+  _stream: getArgProp 0
 
-  _stream.on "drain", ->
-    drained.resolve()
-    drained = Promise.defer()
+type.defineValues
 
-  # Writes content to the stream.
-  self.write = Promise.wrap (content) ->
+  _drained: -> Promise.defer()
 
-    unless _stream.writeable or _stream.writable
-      throw new Error "Can't write to non-writable (possibly closed) stream"
+type.initInstance (stream, encoding) ->
 
-    if typeof content isnt "string"
-      content = new Buffer content
+  if encoding and stream.setEncoding
+    stream.setEncoding encoding
 
-    unless _stream.write content
-      return drained.promise
+  stream.on "error", (error) =>
+    @_drained.reject error
+    @_drained = Promise.defer()
 
-    return Promise()
+  stream.on "drain", =>
+    @_drained.resolve()
+    @_drained = Promise.defer()
 
-  # Waits for all data to flush on the stream.
-  self.flush = ->
-    drained.promise
+type.defineMethods
 
-  # Closes the stream, waiting for the internal buffer to flush.
-  self.close = ->
+  write: (newValue) ->
+    assert @_stream.writeable or @_stream.writable, "Can't write to non-writable (possibly closed) stream!"
+    return Promise() if @_stream.write newValue
+    return @_drained.promise
 
-    if supportsFinish
-      finished = Promise.defer()
-      _stream.on "finish", finished.resolve
-      _stream.on "error", finished.reject
+  flush: ->
+    return @_drained.promise
 
-    _stream.end()
-    drained.resolve()
+  close: ->
+    finished = Promise.defer()
+    @_stream.on "finish", finished.resolve
+    @_stream.on "error", finished.reject
+    @_stream.end()
+    @_drained.resolve()
+    return finished.promise
 
-    if supportsFinish
-      return finished.promise
+  destroy: ->
+    @_stream.destroy()
+    @_drained.resolve()
+    return
 
-    return Promise()
-
-  # Terminates writing on a stream, closing before the internal buffer drains.
-  self.destroy = ->
-    _stream.destroy()
-    drained.resolve()
-    return Promise()
-
-  self.node = _stream
-
-  return Promise self
-
-module.exports = Writer
+module.exports = type.build()

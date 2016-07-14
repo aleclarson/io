@@ -1,18 +1,6 @@
 {
   "name": "io",
-  "version": "2.0.0",
-  "dependencies": {
-    "NamedFunction": "aleclarson/NamedFunction#2.0.0",
-    "Promise": "aleclarson/Promise#1.0.0",
-    "assert": "aleclarson/assert#1.0.0",
-    "assertType": "aleclarson/assertType#1.0.0",
-    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
-    "globby": "aleclarson/globby#4.0.0",
-    "graceful-fs": "^4.1.4",
-    "iconv-lite": "^0.4.10",
-    "mkdirp": "^0.5.1",
-    "rimraf": "^2.4.3"
-  },
+  "version": "2.1.0",
   "lotus": {
     "dest": "js",
     "plugins": [
@@ -22,5 +10,23 @@
       "fs",
       "path"
     ]
+  },
+  "dependencies": {
+    "Null": "aleclarson/Null#1.0.0",
+    "Promise": "aleclarson/Promise#1.0.0",
+    "Type": "aleclarson/Type#1.0.0",
+    "assert": "aleclarson/assert#1.0.0",
+    "assertType": "aleclarson/assertType#1.0.0",
+    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
+    "getArgProp": "aleclarson/getArgProp#1.0.0",
+    "globby": "aleclarson/globby#4.0.0",
+    "graceful-fs": "aleclarson/node-graceful-fs#4.1.4",
+    "has": "aleclarson/has#1.0.0",
+    "iconv-lite": "^0.4.10",
+    "mkdirp": "^0.5.1",
+    "rimraf": "^2.4.3"
+  },
+  "devDependencies": {
+    "random": "aleclarson/random#1.0.4"
   }
 }

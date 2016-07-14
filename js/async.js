@@ -1,5 +1,4 @@
-var Promise, Reader, Writer, appendFile, assert, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile,
-  indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
+var Promise, Reader, Writer, appendFile, assert, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, has, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile;
 
 emptyFunction = require("emptyFunction");
 
@@ -12,6 +11,8 @@ globby = require("globby");
 assert = require("assert");
 
 path = require("path");
+
+has = require("has");
 
 fs = require("fs");
 
@@ -65,47 +66,40 @@ readStats = function(filePath) {
 };
 
 readFile = function(filePath, options) {
-  return openFile(filePath, options).then(function(stream) {
-    return stream.read();
-  });
+  return openFile(filePath, options).read();
 };
 
 openFile = function(filePath, options) {
-  var stream, streamConfig;
+  var config, encoding, stream;
   if (options == null) {
     options = {};
   }
   assertType(filePath, String);
   assertType(options, Object);
-  if (options.flags == null) {
-    options.flags = "r";
+  config = {};
+  if (has(options, "start")) {
+    config.start = options.start;
+    config.end = options.end - 1;
   }
-  streamConfig = {
-    flags: options.flags.replace(/b/g, "") || "r"
-  };
-  if (indexOf.call(options, "bufferSize") >= 0) {
-    streamConfig.bufferSize = options.bufferSize;
+  if (has(options, "bufferSize")) {
+    config.bufferSize = options.bufferSize;
   }
-  if (indexOf.call(options, "mode") >= 0) {
-    streamConfig.mode = options.mode;
+  encoding = null;
+  if (options.encoding !== null) {
+    encoding = options.encoding || "utf-8";
   }
-  if (indexOf.call(options, "begin") >= 0) {
-    streamConfig.start = options.begin;
-    streamConfig.end = options.end - 1;
-  }
-  if (options.flags.indexOf("b") >= 0) {
-    assert(!options.charset, "Cannot open a binary file with a charset: " + options.charset);
-  } else {
-    if (options.charset == null) {
-      options.charset = "utf-8";
+  if (options.writable) {
+    if (has(options, "mode")) {
+      config.mode = options.mode;
     }
+    if (options.append) {
+      config.flags = "a";
+    }
+    stream = fs.createWriteStream(filePath, config);
+    return Writer(stream, encoding);
   }
-  if (options.flags.indexOf("w") >= 0 || options.flags.indexOf("a") >= 0) {
-    stream = fs.createWriteStream(filePath, streamConfig);
-    return Writer(stream, options.charset);
-  }
-  stream = fs.createReadStream(filePath, streamConfig);
-  return Reader(stream, options.charset);
+  stream = fs.createReadStream(filePath, config);
+  return Reader(stream, encoding);
 };
 
 readTree = function(filePath) {
@@ -119,25 +113,23 @@ match = function(globs, options) {
   return globby(globs, options);
 };
 
-writeFile = function(filePath, value, options) {
+writeFile = function(filePath, newValue, options) {
   if (options == null) {
     options = {};
   }
   assertType(filePath, String);
-  assertType(value, [String, Buffer]);
+  assertType(newValue, [String, Buffer]);
   assertType(options, Object);
-  if (options.flags == null) {
-    options.flags = "w";
+  if (newValue instanceof Buffer) {
+    options.encoding = null;
   }
-  if (options.flags.indexOf("b") >= 0) {
-    if (!(value instanceof Buffer)) {
-      value = new Buffer(value);
-    }
-  } else if (value instanceof Buffer) {
-    options.flags += "b";
-  }
-  return openFile(filePath, options).then(function(stream) {
-    return stream.write(value).then(stream.close);
+  return makeTree(path.dirname(filePath)).then(function() {
+    var writer;
+    options.writable = true;
+    writer = openFile(filePath, options);
+    return writer.write(newValue).then(function() {
+      return writer.close();
+    });
   });
 };
 
@@ -145,22 +137,8 @@ appendFile = function(filePath, value, options) {
   if (options == null) {
     options = {};
   }
-  assertType(filePath, String);
-  assertType(value, [String, Buffer]);
-  assertType(options, Object);
-  if (options.flags == null) {
-    options.flags = "a";
-  }
-  if (options.flags.indexOf("b") >= 0) {
-    if (!(value instanceof Buffer)) {
-      value = new Buffer(value);
-    }
-  } else if (value instanceof Buffer) {
-    options.flags += "b";
-  }
-  return openFile(filePath, options).then(function(stream) {
-    return stream.write(value).then(stream.close);
-  });
+  options.append = true;
+  return writeFile(filePath, value, options);
 };
 
 copyFile = function(fromPath, toPath) {
@@ -168,24 +146,18 @@ copyFile = function(fromPath, toPath) {
   assertType(toPath, String);
   return promised.stat(fromPath).then(function(stats) {
     var reader, writer;
-    reader = openFile(fromPath, {
-      flags: "rb"
-    });
+    reader = openFile(fromPath);
     writer = openFile(toPath, {
-      flags: "wb",
-      mode: stats.node.mode
+      mode: stats.mode
     });
-    return Promise.all([reader, writer]).then(function(arg) {
-      var reader, writer;
-      reader = arg[0], writer = arg[1];
-      return reader.forEach(writer.write).then(function() {
-        return Promise.all([reader.close(), write.close()]);
-      });
+    return reader.forEach(writer.write).then(function() {
+      return writer.close();
     });
   });
 };
 
 makeTree = function(filePath, mode) {
+  var dirPath;
   if (mode == null) {
     mode = "755";
   }
@@ -194,36 +166,41 @@ makeTree = function(filePath, mode) {
   if (typeof mode === "string") {
     mode = parseInt(mode, 8);
   }
-  return promised.mkdir(filePath, mode);
+  dirPath = path.dirname(filePath);
+  return exists(dirPath).then(function(dirExists) {
+    return dirExists || makeTree(dirPath, mode);
+  }).then(function() {
+    return promised.mkdir(filePath, mode).fail(function(error) {
+      if (error.code === "EEXIST") {
+        return;
+      }
+      throw error;
+    });
+  });
 };
 
 copyTree = function(fromPath, toPath) {
   assertType(fromPath, String);
   assertType(toPath, String);
   return promised.stat(fromPath).then(function(stats) {
-    if (stats.isFile()) {
-      return copyFile(fromPath, toPath);
-    }
-    if (stats.isDirectory()) {
-      return exists(toPath).then(function(exists) {
-        return exists || makeTree(toPath, stats.node.mode);
-      }).then(function() {
-        return promised.readdir(fromPath);
-      }).then(function(children) {
-        return Promise.map(children, function(child) {
-          var fromChild, toChild;
-          if (path.isAbsolute(child)) {
-            child = path.relative(fromPath);
-          }
-          fromChild = path.join(fromPath, child);
-          toChild = path.join(toPath, child);
-          return copyTree(fromChild, toChild);
-        });
-      });
-    }
     if (stats.isSymbolicLink()) {
       return promised.symlink(toPath, fromPath, "file");
     }
+    if (stats.isFile()) {
+      return copyFile(fromPath, toPath);
+    }
+    return exists(toPath).then(function(exists) {
+      return exists || makeTree(toPath, stats.node.mode);
+    }).then(function() {
+      return promised.readdir(fromPath);
+    }).then(function(children) {
+      return Promise.map(children, function(child) {
+        var fromChild, toChild;
+        fromChild = path.join(fromPath, child);
+        toChild = path.join(toPath, child);
+        return copyTree(fromChild, toChild);
+      });
+    });
   });
 };
 
@@ -248,10 +225,7 @@ removeTree = function(filePath) {
     }
     return promised.readdir(filePath).then(function(children) {
       return Promise.map(children, function(child) {
-        if (!path.isAbsolute(child)) {
-          child = path.join(filePath, child);
-        }
-        return removeTree(child);
+        return removeTree(path.join(filePath, child));
       });
     });
   });

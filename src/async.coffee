@@ -5,6 +5,7 @@ Promise = require "Promise"
 globby = require "globby"
 assert = require "assert"
 path = require "path"
+has = require "has"
 fs = require "fs"
 
 Reader = require "./reader"
@@ -56,39 +57,39 @@ readStats = (filePath) ->
   promised.stat filePath # BUG: Avoid error; only one argument can be passed.
 
 readFile = (filePath, options) ->
-  openFile filePath, options
-  .then (stream) -> stream.read()
+  openFile(filePath, options).read()
 
 openFile = (filePath, options = {}) ->
 
   assertType filePath, String
   assertType options, Object
 
-  options.flags ?= "r"
+  config = {}
 
-  streamConfig =
-    flags: options.flags.replace(/b/g, "") or "r"
+  if has options, "start"
+    config.start = options.start
+    config.end = options.end - 1
 
-  if "bufferSize" in options
-    streamConfig.bufferSize = options.bufferSize
+  if has options, "bufferSize"
+    config.bufferSize = options.bufferSize
 
-  if "mode" in options
-    streamConfig.mode = options.mode
+  encoding = null
+  if options.encoding isnt null
+    encoding = options.encoding or "utf-8"
 
-  if "begin" in options
-    streamConfig.start = options.begin
-    streamConfig.end = options.end - 1
+  if options.writable
 
-  if options.flags.indexOf("b") >= 0
-    assert not options.charset, "Cannot open a binary file with a charset: " + options.charset
-  else options.charset ?= "utf-8"
+    if has options, "mode"
+      config.mode = options.mode
 
-  if options.flags.indexOf("w") >= 0 or options.flags.indexOf("a") >= 0
-    stream = fs.createWriteStream filePath, streamConfig
-    return Writer stream, options.charset
+    if options.append
+      config.flags = "a"
 
-  stream = fs.createReadStream filePath, streamConfig
-  return Reader stream, options.charset
+    stream = fs.createWriteStream filePath, config
+    return Writer stream, encoding
+
+  stream = fs.createReadStream filePath, config
+  return Reader stream, encoding
 
 readTree = (filePath) ->
   assertType filePath, String
@@ -103,52 +104,36 @@ match = (globs, options) ->
 # Mutating data
 #
 
-writeFile = (filePath, value, options = {}) ->
+writeFile = (filePath, newValue, options = {}) ->
 
   assertType filePath, String
-  assertType value, [ String, Buffer ]
+  assertType newValue, [ String, Buffer ]
   assertType options, Object
 
-  options.flags ?= "w"
-  if options.flags.indexOf("b") >= 0
-    unless value instanceof Buffer
-      value = new Buffer value
-  else if value instanceof Buffer
-    options.flags += "b"
+  if newValue instanceof Buffer
+    options.encoding = null
 
-  openFile filePath, options
-  .then (stream) ->
-    stream.write value
-    .then stream.close
+  # Create any missing parent directories.
+  makeTree path.dirname filePath
+
+  .then ->
+    options.writable = yes
+    writer = openFile filePath, options
+    writer.write newValue
+    .then -> writer.close()
 
 appendFile = (filePath, value, options = {}) ->
-
-  assertType filePath, String
-  assertType value, [ String, Buffer ]
-  assertType options, Object
-
-  options.flags ?= "a"
-  if options.flags.indexOf("b") >= 0
-    unless value instanceof Buffer
-      value = new Buffer value
-  else if value instanceof Buffer
-    options.flags += "b"
-
-  openFile filePath, options
-  .then (stream) ->
-    stream.write value
-    .then stream.close
+  options.append = yes
+  writeFile filePath, value, options
 
 copyFile = (fromPath, toPath) ->
   assertType fromPath, String
   assertType toPath, String
   promised.stat(fromPath).then (stats) ->
-    reader = openFile fromPath, flags: "rb"
-    writer = openFile toPath, flags: "wb", mode: stats.node.mode
-    Promise.all [ reader, writer ]
-    .then ([ reader, writer ]) ->
-      reader.forEach writer.write
-      .then -> Promise.all [ reader.close(), write.close() ]
+    reader = openFile fromPath
+    writer = openFile toPath, { mode: stats.mode }
+    reader.forEach writer.write
+    .then -> writer.close()
 
 makeTree = (filePath, mode = "755") ->
 
@@ -158,7 +143,18 @@ makeTree = (filePath, mode = "755") ->
   if typeof mode is "string"
     mode = parseInt mode, 8
 
-  promised.mkdir filePath, mode
+  dirPath = path.dirname filePath
+
+  # Create any missing parent directories.
+  exists dirPath
+  .then (dirExists) ->
+    dirExists or makeTree dirPath, mode
+
+  .then ->
+    promised.mkdir filePath, mode
+    .fail (error) ->
+      return if error.code is "EEXIST"
+      throw error
 
 copyTree = (fromPath, toPath) ->
 
@@ -168,31 +164,23 @@ copyTree = (fromPath, toPath) ->
   promised.stat fromPath
   .then (stats) ->
 
+    if stats.isSymbolicLink()
+      return promised.symlink toPath, fromPath, "file"
+
     if stats.isFile()
       return copyFile fromPath, toPath
 
-    if stats.isDirectory()
+    # Create any missing directories.
+    return exists toPath
+    .then (exists) ->
+      exists or makeTree toPath, stats.node.mode
 
-      return exists toPath
-
-      # Create any missing directories.
-      .then (exists) -> exists or makeTree toPath, stats.node.mode
-
-      .then -> promised.readdir fromPath
-
-      .then (children) ->
-        Promise.map children, (child) ->
-
-          if path.isAbsolute child
-            child = path.relative fromPath
-
-          fromChild = path.join fromPath, child
-          toChild = path.join toPath, child
-
-          return copyTree fromChild, toChild
-
-    if stats.isSymbolicLink()
-      return promised.symlink toPath, fromPath, "file"
+    .then -> promised.readdir fromPath
+    .then (children) ->
+      Promise.map children, (child) ->
+        fromChild = path.join fromPath, child
+        toChild = path.join toPath, child
+        return copyTree fromChild, toChild
 
 moveTree = (fromPath, toPath) ->
 
@@ -204,9 +192,7 @@ moveTree = (fromPath, toPath) ->
 
     # Handle moving files across devices.
     if error.code is "EXDEV"
-
       return copyTree fromPath, toPath
-
       .then -> removeTree fromPath
 
     throw error
@@ -221,15 +207,9 @@ removeTree = (filePath) ->
       return promised.unlink filePath
 
     return promised.readdir filePath
-
     .then (children) ->
-
       Promise.map children, (child) ->
-
-        if not path.isAbsolute child
-          child = path.join filePath, child
-
-        return removeTree child
+        removeTree path.join filePath, child
 
 module.exports = {
   exists
