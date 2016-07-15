@@ -1,6 +1,6 @@
 
 emptyFunction = require "emptyFunction"
-getArgProp = require "getArgProp"
+fromArgs = require "fromArgs"
 Promise = require "Promise"
 Null = require "Null"
 Type = require "Type"
@@ -20,9 +20,9 @@ type.argumentDefaults =
 
 type.defineFrozenValues
 
-  _stream: getArgProp 0
+  _stream: fromArgs 0
 
-  _encoding: getArgProp 1
+  _encoding: fromArgs 1
 
   _end: -> Promise.defer()
 

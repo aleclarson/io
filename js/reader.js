@@ -1,8 +1,8 @@
-var Null, Promise, Type, emptyFunction, fs, getArgProp, type;
+var Null, Promise, Type, emptyFunction, fromArgs, fs, type;
 
 emptyFunction = require("emptyFunction");
 
-getArgProp = require("getArgProp");
+fromArgs = require("fromArgs");
 
 Promise = require("Promise");
 
@@ -24,8 +24,8 @@ type.argumentDefaults = {
 };
 
 type.defineFrozenValues({
-  _stream: getArgProp(0),
-  _encoding: getArgProp(1),
+  _stream: fromArgs(0),
+  _encoding: fromArgs(1),
   _end: function() {
     return Promise.defer();
   },
