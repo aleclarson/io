@@ -1,5 +1,5 @@
 
-# io 2.0.0 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+# io 2.1.0 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
 
 Improves `require("fs")` by:
 
@@ -92,4 +92,4 @@ promise = async.remove filePath
 
 &nbsp;
 
-**TODO:** Write tests!
+**TODO:** Write **more** tests!

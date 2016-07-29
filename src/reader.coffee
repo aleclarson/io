@@ -1,61 +1,101 @@
 
-NamedFunction = require "NamedFunction"
+emptyFunction = require "emptyFunction"
+fromArgs = require "fromArgs"
 Promise = require "Promise"
+Null = require "Null"
+Type = require "Type"
+fs = require "fs"
 
 # Wraps a Node readable stream, providing an API similar
 # to a Narwhal synchronous `io` stream except returning
 # promises for long latency operations.
-Reader = NamedFunction "Reader", (_stream, charset) ->
+type = Type "Reader"
 
-  self = Object.create Reader.prototype
+type.argumentTypes =
+  stream: fs.ReadStream
+  encoding: [ String, Null ]
 
-  if charset and _stream.setEncoding
-    _stream.setEncoding charset
+type.argumentDefaults =
+  encoding: "utf-8"
 
-  begin = Promise.defer()
-  end = Promise.defer()
+type.defineFrozenValues
 
-  _stream.on "error", (reason) ->
-    begin.reject reason
+  _stream: fromArgs 0
 
-  chunks = []
-  receiver = null
+  _encoding: fromArgs 1
 
-  _stream.on "end", ->
-    begin.resolve self
-    end.resolve()
+  _end: -> Promise.defer()
 
-  _stream.on "data", (chunk) ->
-    begin.resolve self
-    if receiver then receiver chunk
-    else chunks.push chunk
+  _chunks: -> []
 
-  slurp = ->
-    result =
-      if charset then chunks.join ""
-      else self.constructor.join chunks
-    chunks.splice 0, chunks.length
-    return result
+type.defineValues
 
-  # Reads all of the remaining data from the stream.
-  self.read = ->
-    receiver = null
-    {promise, resolve} = Promise.defer()
-    end.promise.then -> resolve slurp()
-    return promise
+  _receiver: -> @_defaultReceiver
 
-  # Reads and writes all of the remaining data from the stream in chunks.
-  self.forEach = (write) ->
-    write slurp() if chunks and chunks.length
-    receiver = write
-    return end.promise.then ->
-      receiver = null
+type.initInstance (stream, encoding) ->
 
-  self.close = ->
-    _stream.destroy()
+  if encoding and stream.setEncoding
+    stream.setEncoding encoding
 
-  self.node = _stream
+  stream.on "error", (error) =>
+    @_end.reject error
 
-  return begin.promise
+  stream.on "end", =>
+    @_end.resolve()
 
-module.exports = Reader
+  stream.on "data", (chunk) =>
+    @_receiver chunk
+
+type.defineMethods
+
+  read: ->
+    @_receiver = @_defaultReceiver
+    @_end.promise.then =>
+      @_receiver = emptyFunction
+      contents = @_read()
+      @_chunks.length = 0
+      return contents
+
+  forEach: (receiver) ->
+
+    @_receiver = receiver
+
+    if @_chunks.length
+      receiver @_read()
+      @_chunks.length = 0
+
+    @_end.promise.always =>
+      @_receiver = emptyFunction
+      return
+
+  close: ->
+    @_stream.destroy()
+    return
+
+  _defaultReceiver: (chunk) ->
+    @_chunks.push chunk
+
+  _read: ->
+    return @_join() unless @_encoding
+    return @_chunks.join ""
+
+  _join: ->
+    chunks = @_chunks
+    count = chunks.length
+
+    length = 0
+    index = -1
+    while ++index < count
+      length += chunks[index].length
+
+    chunk = new Buffer length
+
+    offset = 0
+    index = -1
+    while ++index < count
+      chunks[index].copy chunk, offset, 0
+      offset += chunks[index].length
+
+    return chunk
+
+module.exports = type.build()
