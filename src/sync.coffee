@@ -3,12 +3,15 @@ assertType = require "assertType"
 rimraf = require "rimraf"
 mkdirp = require "mkdirp"
 globby = require "globby"
-assert = require "assert"
+Typle = require "Typle"
 iconv = require "iconv-lite"
 path = require "path"
 fs = require "fs"
 
 UTF8 = "utf8"
+
+StringOrArray = Typle [ String, Array ]
+StringOrBuffer = Typle [ String, Buffer ]
 
 #
 # Testing existence
@@ -41,9 +44,13 @@ stats = (filePath) ->
   return fs.statSync filePath
 
 readFile = (filePath, options = {}) ->
+
   assertType filePath, String
   assertType options, Object
-  assert isFile(filePath), "'filePath' must be an existing file!"
+
+  if not isFile filePath
+    throw Error "'filePath' must be an existing file!"
+
   contents = fs.readFileSync filePath
   if options.encoding isnt null
     contents = iconv.decode contents, options.encoding or UTF8
@@ -54,13 +61,15 @@ appendFile = (filePath, contents) ->
 
   assertType filePath, String
   filePath = path.resolve filePath
-  assert not isDir(filePath), "'filePath' cannot be a directory!"
+
+  if isDir filePath
+    throw Error "'filePath' cannot be a directory!"
 
   # Create the file if it does not exist.
   if not exists filePath
     return writeFile filePath, contents
 
-  assertType contents, [ String, Buffer ]
+  assertType contents, StringOrBuffer
   options.encoding ?= UTF8 if not Buffer.isBuffer contents
   contents = iconv.encode contents, options.encoding
   fs.appendFileSync filePath, contents, options
@@ -69,11 +78,14 @@ appendFile = (filePath, contents) ->
 readTree = (filePath) ->
   assertType filePath, String
   filePath = path.resolve filePath
-  assert isDir(filePath), "'filePath' must be an existing directory!"
+
+  if not isDir filePath
+    throw Error "'filePath' must be an existing directory!"
+
   return fs.readdirSync filePath
 
 match = (globs, options) ->
-  assertType globs, [ String, Array ]
+  assertType globs, StringOrArray
   assertType options, Object.Maybe
   return globby.sync globs, options
 
@@ -85,12 +97,14 @@ writeFile = (filePath, contents, options = {}) ->
 
   assertType filePath, String
   filePath = path.resolve filePath
-  assert not isDir(filePath), "'filePath' cannot be a directory!"
+
+  if isDir filePath
+    throw Error "'filePath' cannot be a directory!"
 
   # Create any missing parent directories.
   makeTree path.dirname filePath
 
-  assertType contents, [ String, Buffer ]
+  assertType contents, StringOrBuffer
   options.encoding ?= UTF8 if not Buffer.isBuffer contents
   contents = iconv.encode contents, options.encoding
   fs.writeFileSync filePath, contents, options
@@ -99,7 +113,10 @@ writeFile = (filePath, contents, options = {}) ->
 makeTree = (filePath) ->
   assertType filePath, String
   filePath = path.resolve filePath
-  assert not isFile(filePath), "'filePath' must be a directory or not exist!"
+
+  if isFile filePath
+    throw Error "'filePath' must be a directory or not exist!"
+
   return mkdirp.sync filePath
 
 # Options:
@@ -115,7 +132,8 @@ copyTree = (fromPath, toPath, options = {}) ->
   fromPath = path.resolve fromPath
   toPath = path.resolve toPath
 
-  assert exists(fromPath), "Expected 'fromPath' to exist: '#{fromPath}'"
+  if not exists fromPath
+    throw Error "Expected 'fromPath' to exist: '#{fromPath}'"
 
   if isDir fromPath
 
@@ -133,7 +151,8 @@ copyTree = (fromPath, toPath, options = {}) ->
       copyTree fromChild, toChild, options
 
   # Force an overwrite by setting `options.force` to true.
-  assert options.force or not exists(toPath), "Expected 'toPath' to not exist: '#{toPath}'"
+  unless options.force or not exists toPath
+    throw Error "Expected 'toPath' to not exist: '#{toPath}'"
 
   if options.testRun
     console.log "Copying '#{fromPath}' to '#{toPath}'"
@@ -150,8 +169,11 @@ moveTree = (fromPath, toPath) ->
   fromPath = path.resolve fromPath
   toPath = path.resolve toPath
 
-  assert exists(fromPath), "Expected 'fromPath' to exist: '#{fromPath}'"
-  assert not exists(toPath), "Expected 'toPath' to not exist: '#{toPath}'"
+  if not exists fromPath
+    throw Error "Expected 'fromPath' to exist: '#{fromPath}'"
+
+  if exists toPath
+    throw Error "Expected 'toPath' to not exist: '#{toPath}'"
 
   # Create missing parent directories.
   makeTree path.dirname toPath

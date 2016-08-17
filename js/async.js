@@ -1,4 +1,4 @@
-var Promise, Reader, Writer, appendFile, assert, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, has, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile;
+var Promise, Reader, Writer, appendFile, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, has, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile;
 
 emptyFunction = require("emptyFunction");
 
@@ -7,8 +7,6 @@ assertType = require("assertType");
 Promise = require("Promise");
 
 globby = require("globby");
-
-assert = require("assert");
 
 path = require("path");
 

@@ -1,43 +1,45 @@
-var Null, Promise, Type, emptyFunction, fromArgs, fs, type;
+var Null, Promise, StringOrNull, Type, Typle, emptyFunction, fs, type;
 
 emptyFunction = require("emptyFunction");
 
-fromArgs = require("fromArgs");
-
 Promise = require("Promise");
 
-Null = require("Null");
+Typle = require("Typle");
 
 Type = require("Type");
 
+Null = require("Null");
+
 fs = require("fs");
+
+StringOrNull = Typle([String, Null]);
 
 type = Type("Reader");
 
-type.argumentTypes = {
-  stream: fs.ReadStream,
-  encoding: [String, Null]
-};
-
-type.argumentDefaults = {
-  encoding: "utf-8"
-};
-
-type.defineFrozenValues({
-  _stream: fromArgs(0),
-  _encoding: fromArgs(1),
-  _end: function() {
-    return Promise.defer();
+type.defineArgs({
+  stream: {
+    type: fs.ReadStream,
+    required: true
   },
-  _chunks: function() {
-    return [];
+  encoding: {
+    type: StringOrNull,
+    "default": "utf-8"
   }
 });
 
-type.defineValues({
-  _receiver: function() {
-    return this._defaultReceiver;
-  }
+type.defineFrozenValues(function(stream, encoding) {
+  return {
+    _stream: stream,
+    _encoding: encoding,
+    _end: Promise.defer(),
+    _chunks: []
+  };
+});
+
+type.defineValues(function() {
+  return {
+    _receiver: this._defaultReceiver
+  };
 });
 
 type.initInstance(function(stream, encoding) {

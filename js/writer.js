@@ -1,36 +1,40 @@
-var Null, Promise, Type, assert, fromArgs, fs, type;
-
-fromArgs = require("fromArgs");
+var Null, Promise, StringOrNull, Type, Typle, fs, type;
 
 Promise = require("Promise");
 
-assert = require("assert");
-
-Null = require("Null");
+Typle = require("Typle");
 
 Type = require("Type");
 
+Null = require("Null");
+
 fs = require("fs");
+
+StringOrNull = Typle([String, Null]);
 
 type = Type("Writer");
 
-type.argumentTypes = {
-  stream: fs.WriteStream,
-  encoding: [String, Null]
-};
-
-type.argumentDefaults = {
-  encoding: "utf-8"
-};
-
-type.defineFrozenValues({
-  _stream: fromArgs(0)
+type.defineArgs({
+  stream: {
+    type: fs.WriteStream,
+    required: true
+  },
+  encoding: {
+    type: StringOrNull,
+    encoding: "utf-8"
+  }
 });
 
-type.defineValues({
-  _drained: function() {
-    return Promise.defer();
-  }
+type.defineFrozenValues(function(stream) {
+  return {
+    _stream: stream
+  };
+});
+
+type.defineValues(function() {
+  return {
+    _drained: Promise.defer()
+  };
 });
 
 type.initInstance(function(stream, encoding) {
@@ -53,7 +57,9 @@ type.initInstance(function(stream, encoding) {
 
 type.defineMethods({
   write: function(newValue) {
-    assert(this._stream.writeable || this._stream.writable, "Can't write to non-writable (possibly closed) stream!");
+    if (!(this._stream.writeable || this._stream.writable)) {
+      throw Error("Can't write to non-writable (possibly closed) stream!");
+    }
     if (this._stream.write(newValue)) {
       return Promise();
     }

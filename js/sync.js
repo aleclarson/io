@@ -1,4 +1,4 @@
-var UTF8, appendFile, assert, assertType, copyTree, exists, fs, globby, iconv, isDir, isFile, makeTree, match, mkdirp, moveTree, path, readFile, readTree, removeTree, rimraf, stats, writeFile;
+var StringOrArray, StringOrBuffer, Typle, UTF8, appendFile, assertType, copyTree, exists, fs, globby, iconv, isDir, isFile, makeTree, match, mkdirp, moveTree, path, readFile, readTree, removeTree, rimraf, stats, writeFile;
 
 assertType = require("assertType");
 
@@ -8,7 +8,7 @@ mkdirp = require("mkdirp");
 
 globby = require("globby");
 
-assert = require("assert");
+Typle = require("Typle");
 
 iconv = require("iconv-lite");
 
@@ -17,6 +17,10 @@ path = require("path");
 fs = require("fs");
 
 UTF8 = "utf8";
+
+StringOrArray = Typle([String, Array]);
+
+StringOrBuffer = Typle([String, Buffer]);
 
 exists = function(filePath) {
   assertType(filePath, String);
@@ -49,7 +53,9 @@ readFile = function(filePath, options) {
   }
   assertType(filePath, String);
   assertType(options, Object);
-  assert(isFile(filePath), "'filePath' must be an existing file!");
+  if (!isFile(filePath)) {
+    throw Error("'filePath' must be an existing file!");
+  }
   contents = fs.readFileSync(filePath);
   if (options.encoding !== null) {
     contents = iconv.decode(contents, options.encoding || UTF8);
@@ -63,11 +69,13 @@ readFile = function(filePath, options) {
 appendFile = function(filePath, contents) {
   assertType(filePath, String);
   filePath = path.resolve(filePath);
-  assert(!isDir(filePath), "'filePath' cannot be a directory!");
+  if (isDir(filePath)) {
+    throw Error("'filePath' cannot be a directory!");
+  }
   if (!exists(filePath)) {
     return writeFile(filePath, contents);
   }
-  assertType(contents, [String, Buffer]);
+  assertType(contents, StringOrBuffer);
   if (!Buffer.isBuffer(contents)) {
     if (options.encoding == null) {
       options.encoding = UTF8;
@@ -80,12 +88,14 @@ appendFile = function(filePath, contents) {
 readTree = function(filePath) {
   assertType(filePath, String);
   filePath = path.resolve(filePath);
-  assert(isDir(filePath), "'filePath' must be an existing directory!");
+  if (!isDir(filePath)) {
+    throw Error("'filePath' must be an existing directory!");
+  }
   return fs.readdirSync(filePath);
 };
 
 match = function(globs, options) {
-  assertType(globs, [String, Array]);
+  assertType(globs, StringOrArray);
   assertType(options, Object.Maybe);
   return globby.sync(globs, options);
 };
@@ -96,9 +106,11 @@ writeFile = function(filePath, contents, options) {
   }
   assertType(filePath, String);
   filePath = path.resolve(filePath);
-  assert(!isDir(filePath), "'filePath' cannot be a directory!");
+  if (isDir(filePath)) {
+    throw Error("'filePath' cannot be a directory!");
+  }
   makeTree(path.dirname(filePath));
-  assertType(contents, [String, Buffer]);
+  assertType(contents, StringOrBuffer);
   if (!Buffer.isBuffer(contents)) {
     if (options.encoding == null) {
       options.encoding = UTF8;
@@ -111,7 +123,9 @@ writeFile = function(filePath, contents, options) {
 makeTree = function(filePath) {
   assertType(filePath, String);
   filePath = path.resolve(filePath);
-  assert(!isFile(filePath), "'filePath' must be a directory or not exist!");
+  if (isFile(filePath)) {
+    throw Error("'filePath' must be a directory or not exist!");
+  }
   return mkdirp.sync(filePath);
 };
 
@@ -124,7 +138,9 @@ copyTree = function(fromPath, toPath, options) {
   assertType(options, Object);
   fromPath = path.resolve(fromPath);
   toPath = path.resolve(toPath);
-  assert(exists(fromPath), "Expected 'fromPath' to exist: '" + fromPath + "'");
+  if (!exists(fromPath)) {
+    throw Error("Expected 'fromPath' to exist: '" + fromPath + "'");
+  }
   if (isDir(fromPath)) {
     if (options.testRun) {
       if (!exists(toPath)) {
@@ -143,7 +159,9 @@ copyTree = function(fromPath, toPath, options) {
       return copyTree(fromChild, toChild, options);
     });
   }
-  assert(options.force || !exists(toPath), "Expected 'toPath' to not exist: '" + toPath + "'");
+  if (!(options.force || !exists(toPath))) {
+    throw Error("Expected 'toPath' to not exist: '" + toPath + "'");
+  }
   if (options.testRun) {
     console.log("Copying '" + fromPath + "' to '" + toPath + "'");
     return;
@@ -156,8 +174,12 @@ moveTree = function(fromPath, toPath) {
   assertType(toPath, String);
   fromPath = path.resolve(fromPath);
   toPath = path.resolve(toPath);
-  assert(exists(fromPath), "Expected 'fromPath' to exist: '" + fromPath + "'");
-  assert(!exists(toPath), "Expected 'toPath' to not exist: '" + toPath + "'");
+  if (!exists(fromPath)) {
+    throw Error("Expected 'fromPath' to exist: '" + fromPath + "'");
+  }
+  if (exists(toPath)) {
+    throw Error("Expected 'toPath' to not exist: '" + toPath + "'");
+  }
   makeTree(path.dirname(toPath));
   fs.renameSync(fromPath, toPath);
 };

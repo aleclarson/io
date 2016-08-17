@@ -1,36 +1,32 @@
 
 emptyFunction = require "emptyFunction"
-fromArgs = require "fromArgs"
 Promise = require "Promise"
-Null = require "Null"
+Typle = require "Typle"
 Type = require "Type"
+Null = require "Null"
 fs = require "fs"
 
-# Wraps a Node readable stream, providing an API similar
-# to a Narwhal synchronous `io` stream except returning
-# promises for long latency operations.
+StringOrNull = Typle [ String, Null ]
+
 type = Type "Reader"
 
-type.argumentTypes =
-  stream: fs.ReadStream
-  encoding: [ String, Null ]
+type.defineArgs
+  stream: {type: fs.ReadStream, required: yes}
+  encoding: {type: StringOrNull, default: "utf-8"}
 
-type.argumentDefaults =
-  encoding: "utf-8"
+type.defineFrozenValues (stream, encoding) ->
 
-type.defineFrozenValues
+  _stream: stream
 
-  _stream: fromArgs 0
+  _encoding: encoding
 
-  _encoding: fromArgs 1
+  _end: Promise.defer()
 
-  _end: -> Promise.defer()
+  _chunks: []
 
-  _chunks: -> []
+type.defineValues ->
 
-type.defineValues
-
-  _receiver: -> @_defaultReceiver
+  _receiver: @_defaultReceiver
 
 type.initInstance (stream, encoding) ->
 
