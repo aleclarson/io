@@ -1,4 +1,4 @@
-var Promise, Reader, Writer, appendFile, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, has, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile;
+var Promise, Reader, StringOrArray, StringOrBuffer, StringOrNumber, Typle, Writer, appendFile, assertType, copyFile, copyTree, emptyFunction, exists, fs, globby, has, isDir, isFile, makeTree, match, moveTree, openFile, path, promised, readFile, readStats, readTree, removeTree, writeFile;
 
 emptyFunction = require("emptyFunction");
 
@@ -7,6 +7,8 @@ assertType = require("assertType");
 Promise = require("Promise");
 
 globby = require("globby");
+
+Typle = require("Typle");
 
 path = require("path");
 
@@ -19,6 +21,12 @@ Reader = require("./reader");
 Writer = require("./writer");
 
 require("graceful-fs").gracefulify(fs);
+
+StringOrArray = Typle([String, Array]);
+
+StringOrBuffer = Typle([String, Buffer]);
+
+StringOrNumber = Typle([String, Number]);
 
 promised = {
   "stat": "stat",
@@ -106,7 +114,7 @@ readTree = function(filePath) {
 };
 
 match = function(globs, options) {
-  assertType(globs, [String, Array]);
+  assertType(globs, StringOrArray);
   assertType(options, Object.Maybe);
   return globby(globs, options);
 };
@@ -116,7 +124,7 @@ writeFile = function(filePath, newValue, options) {
     options = {};
   }
   assertType(filePath, String);
-  assertType(newValue, [String, Buffer]);
+  assertType(newValue, StringOrBuffer);
   assertType(options, Object);
   if (newValue instanceof Buffer) {
     options.encoding = null;
@@ -160,7 +168,7 @@ makeTree = function(filePath, mode) {
     mode = "755";
   }
   assertType(filePath, String);
-  assertType(mode, [String, Number]);
+  assertType(mode, StringOrNumber);
   if (typeof mode === "string") {
     mode = parseInt(mode, 8);
   }
