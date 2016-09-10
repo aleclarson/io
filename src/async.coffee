@@ -37,21 +37,31 @@ Object.keys(promised).forEach (key) ->
 #
 
 exists = (filePath) ->
+  assertType filePath, String
   onFulfilled = emptyFunction.thatReturnsTrue
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
   .then onFulfilled, onRejected
 
 isFile = (filePath) ->
+  assertType filePath, String
   onFulfilled = (stats) -> stats.isFile()
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
   .then onFulfilled, onRejected
 
 isDir = (filePath) ->
+  assertType filePath, String
   onFulfilled = (stats) -> stats.isDirectory()
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
+  .then onFulfilled, onRejected
+
+isLink = (filePath) ->
+  assertType filePath, String
+  onFulfilled = (stats) -> stats.isSymbolicLink()
+  onRejected = emptyFunction.thatReturnsFalse
+  promised.lstat filePath
   .then onFulfilled, onRejected
 
 #
@@ -220,6 +230,7 @@ module.exports = {
   exists
   isFile
   isDir
+  isLink
   stats: readStats
   read: readFile
   open: openFile

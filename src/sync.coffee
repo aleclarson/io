@@ -26,13 +26,19 @@ isFile = (filePath) ->
   assertType filePath, String
   filePath = path.resolve filePath
   return exists(filePath) and
-    stats(filePath).isFile()
+    fs.statSync(filePath).isFile()
 
 isDir = (filePath) ->
   assertType filePath, String
   filePath = path.resolve filePath
   return exists(filePath) and
-    stats(filePath).isDirectory()
+    fs.statSync(filePath).isDirectory()
+
+isLink = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  return exists(filePath) and
+    fs.lstatSync(filePath).isSymbolicLink()
 
 #
 # Reading data
@@ -195,6 +201,7 @@ module.exports = {
   exists
   isFile
   isDir
+  isLink
   stats
   read: readFile
   write: writeFile
