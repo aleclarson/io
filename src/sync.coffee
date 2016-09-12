@@ -19,13 +19,10 @@ StringOrNumber = Typle [ String, Number ]
 #
 
 isFile = (filePath) ->
-
   assertType filePath, String
-  filePath = path.resolve filePath
-
   try # The line below throws when nothing exists at the given path.
-    return yes if fs.statSync(filePath).isFile()
-  return no
+    passed = fs.statSync(filePath).isFile()
+  return passed is yes
 
 readFile = (filePath, options = {}) ->
 
@@ -33,7 +30,7 @@ readFile = (filePath, options = {}) ->
   assertType options, Object
 
   if not isFile filePath
-    throw Error "'filePath' must be an existing file: " + filePath
+    throw Error "'filePath' must be an existing file: " + path.resolve filePath
 
   contents = fs.readFileSync filePath
   if options.encoding isnt null
@@ -44,16 +41,18 @@ readFile = (filePath, options = {}) ->
 writeFile = (filePath, contents, options = {}) ->
 
   assertType filePath, String
-  filePath = path.resolve filePath
+  assertType contents, StringOrBuffer
+  assertType options, Object
 
   if isDir filePath
-    throw Error "'filePath' cannot be a directory: " + filePath
+    throw Error "'filePath' cannot be a directory: " + path.resolve filePath
 
   # Create any missing parent directories.
-  writeDir path.dirname filePath
+  writeDir path.dirname path.resolve filePath
 
-  assertType contents, StringOrBuffer
-  options.encoding ?= UTF8 if not Buffer.isBuffer contents
+  if not Buffer.isBuffer contents
+    options.encoding ?= UTF8
+
   contents = iconv.encode contents, options.encoding
   fs.writeFileSync filePath, contents, options
   return
@@ -61,17 +60,18 @@ writeFile = (filePath, contents, options = {}) ->
 appendFile = (filePath, contents) ->
 
   assertType filePath, String
-  filePath = path.resolve filePath
+  assertType contents, StringOrBuffer
 
   if isDir filePath
-    throw Error "'filePath' cannot be a directory: " + filePath
+    throw Error "'filePath' cannot be a directory: " + path.resolve filePath
 
   # Create the file if it does not exist.
   if not exists filePath
     return writeFile filePath, contents
 
-  assertType contents, StringOrBuffer
-  options.encoding ?= UTF8 if not Buffer.isBuffer contents
+  if not Buffer.isBuffer contents
+    options.encoding ?= UTF8
+
   contents = iconv.encode contents, options.encoding
   fs.appendFileSync filePath, contents, options
   return
@@ -81,32 +81,21 @@ appendFile = (filePath, contents) ->
 #
 
 isDir = (filePath) ->
-
   assertType filePath, String
-  filePath = path.resolve filePath
-
   try # The line below throws when nothing exists at the given path.
-    return yes if fs.statSync(filePath).isDirectory()
-  return no
+    passed = fs.statSync(filePath).isDirectory()
+  return passed is yes
 
 readDir = (dirPath) ->
-
   assertType dirPath, String
-  dirPath = path.resolve dirPath
-
   if not isDir dirPath
-    throw Error "'dirPath' must be an existing directory: " + dirPath
-
+    throw Error "'dirPath' must be an existing directory: " + path.resolve dirPath
   return fs.readdirSync dirPath
 
 writeDir = (dirPath) ->
-
   assertType dirPath, String
-  dirPath = path.resolve dirPath
-
   if isFile dirPath
-    throw Error "'dirPath' must be a directory or not exist: " + dirPath
-
+    throw Error "'dirPath' must be a directory or not exist: " + path.resolve dirPath
   return mkdirp.sync dirPath
 
 #
@@ -114,39 +103,34 @@ writeDir = (dirPath) ->
 #
 
 isLinkBroken = (linkPath) ->
-
   assertType linkPath, String
-  linkPath = path.resolve linkPath
-
   if not isLink linkPath
-    throw Error "'linkPath' must be a symbolic link: " + linkPath
-
-  try # The line below throws when the link is broken.
-    return no if fs.statSync filePath
-  return yes
+    throw Error "'linkPath' must be a symbolic link: " + path.resolve linkPath
+  linkParent = path.dirname linkPath
+  targetPath = path.resolve linkParent, readLink linkPath
+  return not exists targetPath
 
 isLink = (filePath) ->
-
   assertType filePath, String
-  filePath = path.resolve filePath
-
   try # The line below throws when nothing exists at the given path.
-    return yes if fs.lstatSync(filePath).isSymbolicLink()
-  return no
+    passed = fs.lstatSync(filePath).isSymbolicLink()
+  return passed is yes
 
 readLink = (linkPath) ->
   assertType linkPath, String
-  linkPath = path.resolve linkPath
   return fs.readlinkSync linkPath
 
 writeLink = (linkPath, targetPath) ->
 
   assertType linkPath, String
-  linkPath = path.resolve linkPath
-  if exists linkPath
+  if isLink linkPath
     rimraf.sync linkPath
 
+  else if exists linkPath
+    throw Error "'linkPath' must be a symlink or not exist: " + path.resolve linkPath
+
   assertType targetPath, String
+  targetPath = path.resolve linkPath, targetPath
   if not exists targetPath
     throw Error "'targetPath' must exist: " + targetPath
 
@@ -159,7 +143,6 @@ writeLink = (linkPath, targetPath) ->
 
 checkPermissions = (mode) -> (filePath) ->
   assertType filePath, String
-  filePath = path.resolve filePath
   try fs.accessSync filePath, mode
   catch error
     return no
@@ -174,13 +157,10 @@ isExecutable = checkPermissions fs.X_OK
 #
 
 exists = (filePath) ->
-
   assertType filePath, String
-  filePath = path.resolve filePath
-
   try # The line below throws when nothing exists at the given path.
-    return yes if fs.lstatSync filePath
-  return no
+    stats = fs.lstatSync filePath
+  return stats isnt undefined
 
 match = (globs, options) ->
   assertType globs, StringOrArray
@@ -189,17 +169,15 @@ match = (globs, options) ->
 
 readStats = (filePath) ->
   assertType filePath, String
-  filePath = path.resolve filePath
   try fs.lstatSync filePath
   catch error
-    throw Error "'filePath' does not exist: " + filePath
+    throw Error "'filePath' does not exist: " + path.resolve filePath
 
 setMode = (filePath, mode = "755") ->
 
   assertType filePath, String
-  filePath = path.resolve filePath
   if not exists filePath
-    throw Error "'filePath' must exist: " + filePath
+    throw Error "'filePath' must exist: " + path.resolve filePath
 
   assertType mode, StringOrNumber
   if typeof mode is "string"
@@ -221,7 +199,7 @@ copyTree = (fromPath, toPath, options = {}) ->
   toPath = path.resolve toPath
 
   if not exists fromPath
-    throw Error "Expected 'fromPath' to exist: " + fromPath
+    throw Error "Expected 'fromPath' to exist: " + path.resolve fromPath
 
   if isDir fromPath
 
@@ -230,7 +208,7 @@ copyTree = (fromPath, toPath, options = {}) ->
       writeDir toPath
 
     else if not exists toPath
-      console.log "Creating '#{toPath}'"
+      console.log "Creating '#{path.resolve toPath}'"
 
     return readDir(fromPath).forEach (child) ->
       fromChild = path.join fromPath, child
@@ -240,12 +218,12 @@ copyTree = (fromPath, toPath, options = {}) ->
 
   # Force an overwrite by setting `options.force` to true.
   unless options.force or not exists toPath
-    throw Error "Expected 'toPath' to not exist: '#{toPath}'"
+    throw Error "Expected 'toPath' to not exist: '#{path.resolve toPath}'"
 
   if not options.testRun
     writeFile toPath, readFile fromPath
   else
-    console.log "Copying '#{fromPath}' to '#{toPath}'"
+    console.log "Copying '#{path.resolve fromPath}' to '#{path.resolve toPath}'"
   return
 
 moveTree = (fromPath, toPath) ->
@@ -253,30 +231,23 @@ moveTree = (fromPath, toPath) ->
   assertType fromPath, String
   assertType toPath, String
 
-  fromPath = path.resolve fromPath
-  toPath = path.resolve toPath
-
   if not exists fromPath
-    throw Error "Expected 'fromPath' to exist: '#{fromPath}'"
+    throw Error "Expected 'fromPath' to exist: '#{path.resolve fromPath}'"
 
   if exists toPath
-    throw Error "Expected 'toPath' to not exist: '#{toPath}'"
+    throw Error "Expected 'toPath' to not exist: '#{path.resolve toPath}'"
 
   # Create missing parent directories.
-  writeDir path.dirname toPath
-
+  writeDir path.dirname path.resolve toPath
   fs.renameSync fromPath, toPath
   return
 
 removeTree = (filePath) ->
-
   assertType filePath, String
-
-  filePath = path.resolve filePath
-  return no if not exists filePath
-
-  rimraf.sync filePath
-  return yes
+  if exists filePath
+    rimraf.sync filePath
+    return yes
+  return no
 
 #
 # Exports
