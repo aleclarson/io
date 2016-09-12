@@ -12,42 +12,20 @@ UTF8 = "utf8"
 
 StringOrArray = Typle [ String, Array ]
 StringOrBuffer = Typle [ String, Buffer ]
+StringOrNumber = Typle [ String, Number ]
 
 #
-# Testing existence
+# Files
 #
-
-exists = (filePath) ->
-  assertType filePath, String
-  filePath = path.resolve filePath
-  return fs.existsSync filePath
 
 isFile = (filePath) ->
+
   assertType filePath, String
   filePath = path.resolve filePath
-  return exists(filePath) and
-    fs.statSync(filePath).isFile()
 
-isDir = (filePath) ->
-  assertType filePath, String
-  filePath = path.resolve filePath
-  return exists(filePath) and
-    fs.statSync(filePath).isDirectory()
-
-isLink = (filePath) ->
-  assertType filePath, String
-  filePath = path.resolve filePath
-  return exists(filePath) and
-    fs.lstatSync(filePath).isSymbolicLink()
-
-#
-# Reading data
-#
-
-stats = (filePath) ->
-  assertType filePath, String
-  filePath = path.resolve filePath
-  return fs.statSync filePath
+  try # The line below throws when nothing exists at the given path.
+    return yes if fs.statSync(filePath).isFile()
+  return no
 
 readFile = (filePath, options = {}) ->
 
@@ -55,7 +33,7 @@ readFile = (filePath, options = {}) ->
   assertType options, Object
 
   if not isFile filePath
-    throw Error "'filePath' must be an existing file!"
+    throw Error "'filePath' must be an existing file: " + filePath
 
   contents = fs.readFileSync filePath
   if options.encoding isnt null
@@ -63,13 +41,30 @@ readFile = (filePath, options = {}) ->
     contents = contents.slice 1 if contents.charCodeAt(0) is 0xFEFF
   return contents
 
+writeFile = (filePath, contents, options = {}) ->
+
+  assertType filePath, String
+  filePath = path.resolve filePath
+
+  if isDir filePath
+    throw Error "'filePath' cannot be a directory: " + filePath
+
+  # Create any missing parent directories.
+  writeDir path.dirname filePath
+
+  assertType contents, StringOrBuffer
+  options.encoding ?= UTF8 if not Buffer.isBuffer contents
+  contents = iconv.encode contents, options.encoding
+  fs.writeFileSync filePath, contents, options
+  return
+
 appendFile = (filePath, contents) ->
 
   assertType filePath, String
   filePath = path.resolve filePath
 
   if isDir filePath
-    throw Error "'filePath' cannot be a directory!"
+    throw Error "'filePath' cannot be a directory: " + filePath
 
   # Create the file if it does not exist.
   if not exists filePath
@@ -81,55 +76,142 @@ appendFile = (filePath, contents) ->
   fs.appendFileSync filePath, contents, options
   return
 
-readTree = (filePath) ->
+#
+# Directories
+#
+
+isDir = (filePath) ->
+
   assertType filePath, String
   filePath = path.resolve filePath
 
-  if not isDir filePath
-    throw Error "'filePath' must be an existing directory!"
+  try # The line below throws when nothing exists at the given path.
+    return yes if fs.statSync(filePath).isDirectory()
+  return no
 
-  return fs.readdirSync filePath
+readDir = (dirPath) ->
+
+  assertType dirPath, String
+  dirPath = path.resolve dirPath
+
+  if not isDir dirPath
+    throw Error "'dirPath' must be an existing directory: " + dirPath
+
+  return fs.readdirSync dirPath
+
+writeDir = (dirPath) ->
+
+  assertType dirPath, String
+  dirPath = path.resolve dirPath
+
+  if isFile dirPath
+    throw Error "'dirPath' must be a directory or not exist: " + dirPath
+
+  return mkdirp.sync dirPath
+
+#
+# Symlinks
+#
+
+isLinkBroken = (linkPath) ->
+
+  assertType linkPath, String
+  linkPath = path.resolve linkPath
+
+  if not isLink linkPath
+    throw Error "'linkPath' must be a symbolic link: " + linkPath
+
+  try # The line below throws when the link is broken.
+    return no if fs.statSync filePath
+  return yes
+
+isLink = (filePath) ->
+
+  assertType filePath, String
+  filePath = path.resolve filePath
+
+  try # The line below throws when nothing exists at the given path.
+    return yes if fs.lstatSync(filePath).isSymbolicLink()
+  return no
+
+readLink = (linkPath) ->
+  assertType linkPath, String
+  linkPath = path.resolve linkPath
+  return fs.readlinkSync linkPath
+
+writeLink = (linkPath, targetPath) ->
+
+  assertType linkPath, String
+  linkPath = path.resolve linkPath
+  if exists linkPath
+    rimraf.sync linkPath
+
+  assertType targetPath, String
+  if not exists targetPath
+    throw Error "'targetPath' must exist: " + targetPath
+
+  fs.symlinkSync targetPath, linkPath
+  return
+
+#
+# Permissions
+#
+
+checkPermissions = (mode) -> (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  try fs.accessSync filePath, mode
+  catch error
+    return no
+  return yes
+
+isReadable = checkPermissions fs.R_OK
+isWritable = checkPermissions fs.W_OK
+isExecutable = checkPermissions fs.X_OK
+
+#
+# General
+#
+
+exists = (filePath) ->
+
+  assertType filePath, String
+  filePath = path.resolve filePath
+
+  try # The line below throws when nothing exists at the given path.
+    return yes if fs.lstatSync filePath
+  return no
 
 match = (globs, options) ->
   assertType globs, StringOrArray
   assertType options, Object.Maybe
   return globby.sync globs, options
 
-#
-# Mutating data
-#
+readStats = (filePath) ->
+  assertType filePath, String
+  filePath = path.resolve filePath
+  try fs.lstatSync filePath
+  catch error
+    throw Error "'filePath' does not exist: " + filePath
 
-writeFile = (filePath, contents, options = {}) ->
+setMode = (filePath, mode = "755") ->
 
   assertType filePath, String
   filePath = path.resolve filePath
+  if not exists filePath
+    throw Error "'filePath' must exist: " + filePath
 
-  if isDir filePath
-    throw Error "'filePath' cannot be a directory!"
+  assertType mode, StringOrNumber
+  if typeof mode is "string"
+    mode = parseInt mode, 8
 
-  # Create any missing parent directories.
-  makeTree path.dirname filePath
-
-  assertType contents, StringOrBuffer
-  options.encoding ?= UTF8 if not Buffer.isBuffer contents
-  contents = iconv.encode contents, options.encoding
-  fs.writeFileSync filePath, contents, options
+  fs.chmodSync filePath, mode
   return
 
-makeTree = (filePath) ->
-  assertType filePath, String
-  filePath = path.resolve filePath
-
-  if isFile filePath
-    throw Error "'filePath' must be a directory or not exist!"
-
-  return mkdirp.sync filePath
-
-# Options:
-#   - force (Boolean): If true, avoid throwing when `toPath` already exists
-#   - recursive (Boolean): If true, copy directories recursively (defaults to only copying files)
-#   - testRun (Boolean): If true, print actions to console instead of actually doing them
 copyTree = (fromPath, toPath, options = {}) ->
+  # force (Boolean): If true, avoid throwing when `toPath` already exists
+  # recursive (Boolean): If true, copy directories recursively (defaults to only copying files)
+  # testRun (Boolean): If true, print actions to console instead of actually doing them
 
   assertType fromPath, String
   assertType toPath, String
@@ -139,18 +221,18 @@ copyTree = (fromPath, toPath, options = {}) ->
   toPath = path.resolve toPath
 
   if not exists fromPath
-    throw Error "Expected 'fromPath' to exist: '#{fromPath}'"
+    throw Error "Expected 'fromPath' to exist: " + fromPath
 
   if isDir fromPath
 
-    if options.testRun
-      if not exists toPath
-        console.log "Creating '#{toPath}'"
-
     # Copy the directory even if it's empty.
-    else makeTree toPath
+    if not options.testRun
+      writeDir toPath
 
-    return readTree(fromPath).forEach (child) ->
+    else if not exists toPath
+      console.log "Creating '#{toPath}'"
+
+    return readDir(fromPath).forEach (child) ->
       fromChild = path.join fromPath, child
       return if isDir(fromChild) and not options.recursive
       toChild = path.join toPath, child
@@ -160,11 +242,10 @@ copyTree = (fromPath, toPath, options = {}) ->
   unless options.force or not exists toPath
     throw Error "Expected 'toPath' to not exist: '#{toPath}'"
 
-  if options.testRun
+  if not options.testRun
+    writeFile toPath, readFile fromPath
+  else
     console.log "Copying '#{fromPath}' to '#{toPath}'"
-    return
-
-  writeFile toPath, readFile fromPath
   return
 
 moveTree = (fromPath, toPath) ->
@@ -182,7 +263,7 @@ moveTree = (fromPath, toPath) ->
     throw Error "Expected 'toPath' to not exist: '#{toPath}'"
 
   # Create missing parent directories.
-  makeTree path.dirname toPath
+  writeDir path.dirname toPath
 
   fs.renameSync fromPath, toPath
   return
@@ -197,19 +278,46 @@ removeTree = (filePath) ->
   rimraf.sync filePath
   return yes
 
+#
+# Exports
+#
+
 module.exports = {
-  exists
+
+  # Files
   isFile
-  isDir
-  isLink
-  stats
   read: readFile
   write: writeFile
   append: appendFile
+
+  # Directories
+  isDir
+  readDir
+  writeDir
+
+  # Symlinks
+  isLinkBroken
+  isLink
+  readLink
+  writeLink
+
+  # Permissions
+  isReadable
+  isWritable
+  isExecutable
+
+  # General
+  exists
   match
-  readDir: readTree
-  makeDir: makeTree
+  readStats
+  setMode
   copy: copyTree
   move: moveTree
   remove: removeTree
+
+  # These will be deprecated in the future.
+  link: writeLink
+  chmod: setMode
+  stats: readStats
+  makeDir: writeDir
 }
