@@ -1,15 +1,13 @@
 {
   "name": "io",
   "version": "2.1.0",
-  "lotus": {
-    "dest": "js",
-    "plugins": [
-      "lotus-coffee"
-    ],
-    "implicitDependencies": [
-      "fs",
-      "path"
-    ]
+  "dest": "js",
+  "plugins": [
+    "lotus-coffee"
+  ],
+  "scripts": {
+    "build": "coffee -cb -o js src",
+    "postinstall": "postinstall-build js 'npm run build'"
   },
   "dependencies": {
     "Null": "aleclarson/Null#1.0.0",
@@ -23,9 +21,15 @@
     "has": "aleclarson/has#1.0.0",
     "iconv-lite": "^0.4.10",
     "mkdirp": "^0.5.1",
+    "postinstall-build": "0.2.x",
     "rimraf": "^2.4.3"
   },
   "devDependencies": {
-    "random": "aleclarson/random#1.0.4"
-  }
+    "random": "aleclarson/random#1.0.4",
+    "coffee-script": "1.9.x"
+  },
+  "implicitDependencies": [
+    "fs",
+    "path"
+  ]
 }
