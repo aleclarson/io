@@ -3,7 +3,7 @@ emptyFunction = require "emptyFunction"
 assertType = require "assertType"
 Promise = require "Promise"
 globby = require "globby"
-assert = require "assert"
+Typle = require "Typle"
 path = require "path"
 has = require "has"
 fs = require "fs"
@@ -13,6 +13,10 @@ Writer = require "./writer"
 
 # Support exponential backoff.
 require("graceful-fs").gracefulify(fs)
+
+StringOrArray = Typle [ String, Array ]
+StringOrBuffer = Typle [ String, Buffer ]
+StringOrNumber = Typle [ String, Number ]
 
 promised = {
   "stat"
@@ -27,26 +31,37 @@ promised = {
 Object.keys(promised).forEach (key) ->
   promised[key] = Promise.ify fs[key]
 
+
 #
 # Testing existence
 #
 
 exists = (filePath) ->
+  assertType filePath, String
   onFulfilled = emptyFunction.thatReturnsTrue
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
   .then onFulfilled, onRejected
 
 isFile = (filePath) ->
+  assertType filePath, String
   onFulfilled = (stats) -> stats.isFile()
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
   .then onFulfilled, onRejected
 
 isDir = (filePath) ->
+  assertType filePath, String
   onFulfilled = (stats) -> stats.isDirectory()
   onRejected = emptyFunction.thatReturnsFalse
   promised.stat filePath
+  .then onFulfilled, onRejected
+
+isLink = (filePath) ->
+  assertType filePath, String
+  onFulfilled = (stats) -> stats.isSymbolicLink()
+  onRejected = emptyFunction.thatReturnsFalse
+  promised.lstat filePath
   .then onFulfilled, onRejected
 
 #
@@ -96,7 +111,7 @@ readTree = (filePath) ->
   return promised.readdir filePath
 
 match = (globs, options) ->
-  assertType globs, [ String, Array ]
+  assertType globs, StringOrArray
   assertType options, Object.Maybe
   return globby globs, options
 
@@ -107,7 +122,7 @@ match = (globs, options) ->
 writeFile = (filePath, newValue, options = {}) ->
 
   assertType filePath, String
-  assertType newValue, [ String, Buffer ]
+  assertType newValue, StringOrBuffer
   assertType options, Object
 
   if newValue instanceof Buffer
@@ -138,7 +153,7 @@ copyFile = (fromPath, toPath) ->
 makeTree = (filePath, mode = "755") ->
 
   assertType filePath, String
-  assertType mode, [ String, Number ]
+  assertType mode, StringOrNumber
 
   if typeof mode is "string"
     mode = parseInt mode, 8
@@ -215,6 +230,7 @@ module.exports = {
   exists
   isFile
   isDir
+  isLink
   stats: readStats
   read: readFile
   open: openFile
