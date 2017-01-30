@@ -101,10 +101,10 @@ openFile = (filePath, options = {}) ->
       config.flags = "a"
 
     stream = fs.createWriteStream filePath, config
-    return Writer stream, encoding
+    return Writer {stream, encoding}
 
   stream = fs.createReadStream filePath, config
-  return Reader stream, encoding
+  return Reader {stream, encoding}
 
 readTree = (filePath) ->
   assertType filePath, String
