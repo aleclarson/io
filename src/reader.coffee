@@ -1,12 +1,10 @@
 
 emptyFunction = require "emptyFunction"
 Promise = require "Promise"
-Typle = require "Typle"
+Either = require "Either"
 Type = require "Type"
 Null = require "Null"
 fs = require "fs"
-
-StringOrNull = Typle [ String, Null ]
 
 type = Type "Reader"
 
@@ -15,7 +13,7 @@ type.defineArgs ->
   required: yes
   types:
     stream: fs.ReadStream
-    encoding: StringOrNull
+    encoding: Either String, Null
 
   defaults:
     encoding: "utf-8"
