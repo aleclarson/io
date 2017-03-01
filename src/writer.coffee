@@ -1,36 +1,42 @@
 
 Promise = require "Promise"
-Typle = require "Typle"
+Either = require "Either"
 Type = require "Type"
 Null = require "Null"
 fs = require "fs"
 
-StringOrNull = Typle [ String, Null ]
-
 type = Type "Writer"
 
-type.defineArgs
-  stream: {type: fs.WriteStream, required: yes}
-  encoding: {type: StringOrNull, encoding: "utf-8"}
+type.defineArgs ->
 
-type.defineFrozenValues (stream) ->
+  required: yes
+  types:
+    stream: fs.WriteStream
+    encoding: Either String, Null
 
-  _stream: stream
+  defaults:
+    encoding: "utf-8"
+
+type.defineFrozenValues (options) ->
+
+  _stream: options.stream
+
+  _encoding: options.encoding
 
 type.defineValues ->
 
   _drained: Promise.defer()
 
-type.initInstance (stream, encoding) ->
+type.initInstance ->
 
-  if encoding and stream.setEncoding
-    stream.setEncoding encoding
+  if @_encoding and @_stream.setEncoding
+    @_stream.setEncoding @_encoding
 
-  stream.on "error", (error) =>
+  @_stream.on "error", (error) =>
     @_drained.reject error
     @_drained = Promise.defer()
 
-  stream.on "drain", =>
+  @_stream.on "drain", =>
     @_drained.resolve()
     @_drained = Promise.defer()
 

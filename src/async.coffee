@@ -2,8 +2,8 @@
 emptyFunction = require "emptyFunction"
 assertType = require "assertType"
 Promise = require "Promise"
+Either = require "Either"
 globby = require "globby"
-Typle = require "Typle"
 path = require "path"
 has = require "has"
 fs = require "fs"
@@ -14,9 +14,9 @@ Writer = require "./writer"
 # Support exponential backoff.
 require("graceful-fs").gracefulify(fs)
 
-StringOrArray = Typle [ String, Array ]
-StringOrBuffer = Typle [ String, Buffer ]
-StringOrNumber = Typle [ String, Number ]
+StringOrArray = Either String, Array
+StringOrBuffer = Either String, Buffer
+StringOrNumber = Either String, Number
 
 promised = {
   "stat"
@@ -101,10 +101,10 @@ openFile = (filePath, options = {}) ->
       config.flags = "a"
 
     stream = fs.createWriteStream filePath, config
-    return Writer stream, encoding
+    return Writer {stream, encoding}
 
   stream = fs.createReadStream filePath, config
-  return Reader stream, encoding
+  return Reader {stream, encoding}
 
 readTree = (filePath) ->
   assertType filePath, String

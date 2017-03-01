@@ -1,18 +1,18 @@
 
 assertType = require "assertType"
+Either = require "Either"
 rimraf = require "rimraf"
 mkdirp = require "mkdirp"
 globby = require "globby"
-Typle = require "Typle"
 iconv = require "iconv-lite"
 path = require "path"
 fs = require "fs"
 
 UTF8 = "utf8"
 
-StringOrArray = Typle [ String, Array ]
-StringOrBuffer = Typle [ String, Buffer ]
-StringOrNumber = Typle [ String, Number ]
+StringOrArray = Either String, Array
+StringOrBuffer = Either String, Buffer
+StringOrNumber = Either String, Number
 
 #
 # Files

@@ -1,24 +1,28 @@
 
 emptyFunction = require "emptyFunction"
 Promise = require "Promise"
-Typle = require "Typle"
+Either = require "Either"
 Type = require "Type"
 Null = require "Null"
 fs = require "fs"
 
-StringOrNull = Typle [ String, Null ]
-
 type = Type "Reader"
 
-type.defineArgs
-  stream: {type: fs.ReadStream, required: yes}
-  encoding: {type: StringOrNull, default: "utf-8"}
+type.defineArgs ->
 
-type.defineFrozenValues (stream, encoding) ->
+  required: yes
+  types:
+    stream: fs.ReadStream
+    encoding: Either String, Null
 
-  _stream: stream
+  defaults:
+    encoding: "utf-8"
 
-  _encoding: encoding
+type.defineFrozenValues (options) ->
+
+  _stream: options.stream
+
+  _encoding: options.encoding
 
   _end: Promise.defer()
 
@@ -28,18 +32,18 @@ type.defineValues ->
 
   _receiver: @_defaultReceiver
 
-type.initInstance (stream, encoding) ->
+type.initInstance ->
 
-  if encoding and stream.setEncoding
-    stream.setEncoding encoding
+  if @_encoding and @_stream.setEncoding
+    @_stream.setEncoding @_encoding
 
-  stream.on "error", (error) =>
+  @_stream.on "error", (error) =>
     @_end.reject error
 
-  stream.on "end", =>
+  @_stream.on "end", =>
     @_end.resolve()
 
-  stream.on "data", (chunk) =>
+  @_stream.on "data", (chunk) =>
     @_receiver chunk
 
 type.defineMethods
