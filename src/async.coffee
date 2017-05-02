@@ -2,7 +2,6 @@
 emptyFunction = require "emptyFunction"
 assertType = require "assertType"
 Promise = require "Promise"
-Either = require "Either"
 globby = require "globby"
 path = require "path"
 has = require "has"
@@ -14,9 +13,9 @@ Writer = require "./writer"
 # Support exponential backoff.
 require("graceful-fs").gracefulify(fs)
 
-StringOrArray = Either String, Array
-StringOrBuffer = Either String, Buffer
-StringOrNumber = Either String, Number
+StringOrArray = String.or Array
+StringOrBuffer = String.or Buffer
+StringOrNumber = String.or Number
 
 promised = {
   "stat"
