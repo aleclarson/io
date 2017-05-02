@@ -1,5 +1,5 @@
 
-# io v2.2.1 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+# io v2.2.2 [![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
 
 Improves `require("fs")` by:
 
