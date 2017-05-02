@@ -1,6 +1,5 @@
 
 Promise = require "Promise"
-Either = require "Either"
 Type = require "Type"
 Null = require "Null"
 fs = require "fs"
@@ -12,7 +11,7 @@ type.defineArgs ->
   required: yes
   types:
     stream: fs.WriteStream
-    encoding: Either String, Null
+    encoding: String.or Null
 
   defaults:
     encoding: "utf-8"

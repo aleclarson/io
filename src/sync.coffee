@@ -1,6 +1,5 @@
 
 assertType = require "assertType"
-Either = require "Either"
 rimraf = require "rimraf"
 mkdirp = require "mkdirp"
 globby = require "globby"
@@ -10,9 +9,9 @@ fs = require "fs"
 
 UTF8 = "utf8"
 
-StringOrArray = Either String, Array
-StringOrBuffer = Either String, Buffer
-StringOrNumber = Either String, Number
+StringOrArray = String.or Array
+StringOrBuffer = String.or Buffer
+StringOrNumber = String.or Number
 
 #
 # Files
