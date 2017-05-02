@@ -1,0 +1,18 @@
+{
+  "name": "io",
+  "version": "2.2.2",
+  "dest": "js",
+  "dependencies": {
+    "Null": "aleclarson/Null#1.0.2",
+    "Promise": "aleclarson/Promise#2.2.3",
+    "Type": "aleclarson/Type#2.4.0",
+    "assertType": "aleclarson/assertType#2.0.2",
+    "emptyFunction": "aleclarson/emptyFunction#1.0.0",
+    "globby": "aleclarson/globby#4.0.1",
+    "graceful-fs": "aleclarson/node-graceful-fs#4.1.4",
+    "has": "aleclarson/has#1.0.0",
+    "iconv-lite": "^0.4.10",
+    "mkdirp": "^0.5.1",
+    "rimraf": "^2.4.3"
+  }
+}
